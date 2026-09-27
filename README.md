@@ -1,16 +1,46 @@
-# React + Vite
+# SMAgent front
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SPA for SMAgent — the social-media agent backend (Spring Boot, see `../smagent`).
+Write one post, tailor it per platform, publish to every connected social
+account, and keep the full attempt history. AI assistance (providers,
+generation) and engagement tracking are stubbed until the backend ships them.
 
-Currently, two official plugins are available:
+## Dev
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev        # http://localhost:5173 (backend expected on :8080)
+```
 
-## React Compiler
+- The app calls same-origin `/api`; Vite's dev server proxies it to the backend
+  (`SMAGENT_BACKEND_URL` overrides the target, default `http://localhost:8080`).
+- The proxy strips the `Origin` header, so any dev port works. (The backend's
+  CORS allowlist only knows `http://localhost:5173` — see
+  `smagent.cors.allowed-origins`.)
+- Login with the seeded owner account (`SMAGENT_ADMIN_USERNAME` /
+  `SMAGENT_ADMIN_PASSWORD` on the backend side).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Scripts
 
-## Expanding the ESLint configuration
+| Command             | What it does                          |
+|---------------------|---------------------------------------|
+| `npm run dev`       | Dev server with `/api` proxy          |
+| `npm run build`     | Type-check + production build         |
+| `npm run typecheck` | `tsc -b` only                         |
+| `npm run lint`      | ESLint                                |
+| `npm run preview`   | Serve the production build            |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Structure
+
+```
+src/
+  api/        typed fetch client + per-resource modules (auth, accounts, posts)
+  hooks/      auth & toast providers/contexts, useApiQuery data hook
+  components/ AppShell (rail/topbar), UI kit (pills, modal, tiles…), icons
+  views/      Login, Dashboard, Posts, PostEditor (composer), Accounts,
+              Ai + Inbox (stubs — backend endpoints not implemented yet)
+  styles/     design tokens + component styles (ported from the approved
+              prototype: premium dark + gold, light theme via ◐ toggle)
+```
+
+`VITE_API_BASE` overrides the API base (defaults to same-origin `/api`).

@@ -1,0 +1,73 @@
+/* ============================================================================
+   SMAgent — design tokens & base.
+   Ported from the approved "Trader Spirit Cockpit" prototype: premium dark
+   surfaces + gold accent, with a light variant toggled via [data-theme].
+   ========================================================================== */
+
+:root {
+  --bg:        #05080c;
+  --surface:   #0b0f16;
+  --surface-2: #0e131c;
+  --card:      #11151e;
+  --card-hover:#161c28;
+  --line:      rgba(255,255,255,.08);
+  --line-str:  rgba(255,255,255,.15);
+  --text:      #f4f6fa;
+  --text-dim:  #8d96a8;
+  --text-mute: #5a6472;
+  --gold:      #e4b24c;
+  --gold-deep: #c9993a;
+  --gold-soft: rgba(228,178,76,.14);
+  --gold-line: rgba(228,178,76,.4);
+  --ok:        #4ade80;
+  --ok-soft:   rgba(74,222,128,.13);
+  --danger:    #f0674a;
+  --danger-soft:rgba(240,103,74,.13);
+  --warn:      #e9b949;
+  --warn-soft: rgba(233,185,73,.13);
+  --info:      #5aa9f0;
+  --info-soft: rgba(90,169,240,.13);
+  --shadow:    0 1px 0 rgba(255,255,255,.03) inset, 0 12px 30px -18px rgba(0,0,0,.7);
+  --radius:    14px;
+  --radius-lg: 20px;
+  --font:      'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono:      'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root[data-theme="light"] {
+  --bg:#eef0f4; --surface:#fff; --surface-2:#f5f6f9; --card:#fff; --card-hover:#f7f8fb;
+  --line:rgba(10,15,25,.10); --line-str:rgba(10,15,25,.20); --text:#121821; --text-dim:#55606f;
+  --text-mute:#8a94a3; --gold:#a9781a; --gold-deep:#8a6011; --gold-soft:rgba(169,120,26,.12);
+  --gold-line:rgba(169,120,26,.35); --ok:#158a4a; --ok-soft:rgba(21,138,74,.12);
+  --danger:#c8412a; --danger-soft:rgba(200,65,42,.12); --warn:#9a6c00; --warn-soft:rgba(154,108,0,.12);
+  --info:#2f6fb0; --info-soft:rgba(47,111,176,.12);
+  --shadow:0 1px 2px rgba(10,15,25,.06), 0 16px 34px -24px rgba(10,15,25,.35);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+h1,h2,h3,h4 { margin: 0; text-wrap: balance; font-weight: 700; letter-spacing: -.01em; }
+button { font: inherit; color: inherit; cursor: pointer; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.num  { font-variant-numeric: tabular-nums; }
