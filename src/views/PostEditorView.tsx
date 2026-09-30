@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { accountsApi } from '../api/accounts'
 import { postsApi } from '../api/posts'
-import type { AccountDto, Platform, PostDto, PostInput, PublishResult } from '../api/types'
+import type { AccountDto, Platform, PostContent, PostDto, PostInput, PublishResult } from '../api/types'
 import { Icon } from '../components/Icon'
 import {
   Callout,
@@ -21,33 +21,48 @@ import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
 
 type Tab = 'GENERIC' | Platform
 
+interface OverrideForm {
+  on: boolean
+  title: string
+  text: string
+}
+
 interface FormState {
   title: string
   text: string
-  ovr: Record<Platform, string>
-  ovrOn: Record<Platform, boolean>
+  ovr: Record<Platform, OverrideForm>
 }
 
 const EMPTY_FORM: FormState = {
   title: '',
   text: '',
-  ovr: { FACEBOOK: '', REDDIT: '' },
-  ovrOn: { FACEBOOK: false, REDDIT: false },
+  ovr: {
+    FACEBOOK: { on: false, title: '', text: '' },
+    REDDIT: { on: false, title: '', text: '' },
+  },
 }
 
 function formFromPost(post: PostDto): FormState {
-  return {
-    title: post.title ?? '',
-    text: post.text,
-    ovr: {
-      FACEBOOK: post.overrides?.FACEBOOK ?? '',
-      REDDIT: post.overrides?.REDDIT ?? '',
-    },
-    ovrOn: {
-      FACEBOOK: !!post.overrides?.FACEBOOK,
-      REDDIT: !!post.overrides?.REDDIT,
-    },
+  const ovr = (p: Platform): OverrideForm => {
+    const o = post.overrides?.[p]
+    return o ? { on: true, title: o.title ?? '', text: o.text } : { on: false, title: '', text: '' }
   }
+  return {
+    title: post.content.title ?? '',
+    text: post.content.text,
+    ovr: { FACEBOOK: ovr('FACEBOOK'), REDDIT: ovr('REDDIT') },
+  }
+}
+
+/** Per-field fallback exactly as the backend resolves at publish time. */
+function effectiveTitle(form: FormState, platform: Platform): string {
+  const o = form.ovr[platform]
+  return o.on && o.title.trim() ? o.title : form.title
+}
+
+function effectiveText(form: FormState, platform: Platform): string {
+  const o = form.ovr[platform]
+  return o.on && o.text.trim() ? o.text : form.text
 }
 
 /* --- Live preview --------------------------------------------------------- */
@@ -65,8 +80,9 @@ function PreviewCard({
 }) {
   const meta = PLATFORMS[platform]
   const account = accounts.find((a) => a.platform === platform)
-  const override = form.ovrOn[platform] && form.ovr[platform].trim()
-  const text = override ? form.ovr[platform] : form.text
+  const override = form.ovr[platform].on
+  const title = effectiveTitle(form, platform)
+  const text = effectiveText(form, platform)
   const len = text.length
   const over = len > meta.maxLength
 
@@ -92,9 +108,9 @@ function PreviewCard({
           ))}
         </div>
       </div>
-      {form.title.trim() && (
+      {title.trim() && (
         <div className="pbody" style={{ fontWeight: 600, marginBottom: 6 }}>
-          {form.title}
+          {title}
         </div>
       )}
       <div className="pbody">
@@ -129,7 +145,8 @@ function PublishModal({
   onConfirm: () => void
 }) {
   const chosen = accounts.filter((a) => selected.includes(a.id))
-  const redditNeedsTitle = chosen.some((a) => a.platform === 'REDDIT') && !form.title.trim()
+  const redditNeedsTitle =
+    chosen.some((a) => a.platform === 'REDDIT') && !effectiveTitle(form, 'REDDIT').trim()
 
   if (results) {
     const ok = results.results.filter((r) => r.status === 'SUCCESS').length
@@ -205,7 +222,7 @@ function PublishModal({
       ) : (
         <div className="list" style={{ marginTop: -6 }}>
           {chosen.map((a) => {
-            const usesOverride = form.ovrOn[a.platform] && form.ovr[a.platform].trim()
+            const usesOverride = form.ovr[a.platform].on
             return (
               <div key={a.id} className="row plain" style={{ gridTemplateColumns: '1fr auto', padding: '11px 0' }}>
                 <div>
@@ -311,25 +328,32 @@ function Editor({
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
 
-  const buildInput = (): PostInput => ({
-    title: form.title.trim() || null,
-    text: form.text,
-    overrides: {
-      ...(form.ovrOn.FACEBOOK && form.ovr.FACEBOOK.trim() ? { FACEBOOK: form.ovr.FACEBOOK } : {}),
-      ...(form.ovrOn.REDDIT && form.ovr.REDDIT.trim() ? { REDDIT: form.ovr.REDDIT } : {}),
-    },
-  })
-
-  /** Create or update; returns the saved post or null on failure. */
-  const save = async (navigateAfterCreate: boolean): Promise<PostDto | null> => {
+  const buildInput = (): PostInput | null => {
     if (!form.text.trim()) {
       setFormError('Post text is required.')
       return null
     }
-    setFormError(null)
+    for (const p of PLATFORM_LIST) {
+      if (form.ovr[p].on && !form.ovr[p].text.trim()) {
+        setFormError(`The ${PLATFORMS[p].label} override needs its own text (or disable it).`)
+        return null
+      }
+    }
+    const overrides: Partial<Record<Platform, PostContent>> = {}
+    for (const p of PLATFORM_LIST) {
+      if (form.ovr[p].on) {
+        overrides[p] = { title: form.ovr[p].title.trim() || null, text: form.ovr[p].text }
+      }
+    }
+    return { content: { title: form.title.trim() || null, text: form.text }, overrides }
+  }
+
+  /** Create or update; returns the saved post or null on failure. */
+  const save = async (navigateAfterCreate: boolean): Promise<PostDto | null> => {
+    const input = buildInput()
+    if (!input) return null
     setSaving(true)
     try {
-      const input = buildInput()
       const saved = postId ? await postsApi.update(postId, input) : await postsApi.create(input)
       setBaseline(JSON.stringify(formFromPost(saved)))
       toast(postId ? 'Draft saved' : 'Draft created')
@@ -385,7 +409,7 @@ function Editor({
     }
     setDeleting(true)
     try {
-      await postsApi.remove(postId)
+      await postsApi.remove(postId, readOnly ? false : undefined)
       toast('Post deleted')
       nav('/posts')
     } catch (e) {
@@ -428,7 +452,7 @@ function Editor({
               {PLATFORM_LIST.map((p) => (
                 <button key={p} className={tab === p ? 'active' : ''} onClick={() => setTab(p)}>
                   {PLATFORMS[p].label}
-                  {form.ovrOn[p] && <span style={{ color: 'var(--gold)' }}> *</span>}
+                  {form.ovr[p].on && <span style={{ color: 'var(--gold)' }}> *</span>}
                 </button>
               ))}
             </div>
@@ -475,34 +499,50 @@ function Editor({
                 >
                   <input
                     type="checkbox"
-                    checked={form.ovrOn[tab]}
+                    checked={form.ovr[tab].on}
                     disabled={readOnly}
-                    onChange={(e) => setForm((f) => ({ ...f, ovrOn: { ...f.ovrOn, [tab]: e.target.checked } }))}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], on: e.target.checked } } }))
+                    }
                   />
                   <span style={{ fontSize: 12.5 }}>
-                    Override the text for <b>{PLATFORMS[tab].label}</b> (character limit{' '}
+                    Override content for <b>{PLATFORMS[tab].label}</b> (character limit{' '}
                     {PLATFORMS[tab].maxLength.toLocaleString('en-US')})
                   </span>
                 </label>
                 <label className="field">
                   <span className="lab">
-                    {PLATFORMS[tab].label} text — full replacement of the generic text when enabled
+                    {PLATFORMS[tab].label} title — optional, falls back to the generic title when empty
                   </span>
+                  <input
+                    type="text"
+                    value={form.ovr[tab].title}
+                    disabled={readOnly || !form.ovr[tab].on}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], title: e.target.value } } }))
+                    }
+                    placeholder={form.ovr[tab].on ? form.title || 'no generic title either' : '—'}
+                  />
+                </label>
+                <label className="field">
+                  <span className="lab">{PLATFORMS[tab].label} text — required when the override is enabled</span>
                   <textarea
                     rows={8}
-                    value={form.ovr[tab]}
-                    disabled={readOnly || !form.ovrOn[tab]}
-                    onChange={(e) => setForm((f) => ({ ...f, ovr: { ...f.ovr, [tab]: e.target.value } }))}
+                    value={form.ovr[tab].text}
+                    disabled={readOnly || !form.ovr[tab].on}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], text: e.target.value } } }))
+                    }
                     placeholder={
-                      form.ovrOn[tab]
+                      form.ovr[tab].on
                         ? `${PLATFORMS[tab].label}-specific variant of this post…`
                         : 'Enable the override to write a platform-specific variant.'
                     }
                   />
                 </label>
                 <p className="hint">
-                  Without an override the platform receives the generic text. Overrides replace it wholesale —
-                  tweak length, tone or details per platform.
+                  Each field falls back individually: an empty override title uses the generic title; the text
+                  replaces the generic text wholesale on that platform only.
                 </p>
               </>
             )}
@@ -597,7 +637,7 @@ function Editor({
             </div>
             <p className="hint" style={{ margin: '10px 0 0' }}>
               {readOnly
-                ? 'Delete removes the post and its local publication rows — it does NOT delete the post on the platforms.'
+                ? 'Delete soft-deletes the post locally; publication history is kept and platform copies stay.'
                 : 'Publish creates one attempt per selected account; the post becomes PUBLISHED once at least one target succeeds.'}
             </p>
           </div>
@@ -671,11 +711,15 @@ function Editor({
         <ConfirmModal
           title={readOnly ? 'Delete published post' : 'Delete draft'}
           message={
-            <>
-              This removes the post <b>and its local publication history</b>. It does <b>not</b> delete the
-              post on the platforms — that requires deleting each publication on the platform itself
-              (planned backend extension).
-            </>
+            readOnly ? (
+              <>
+                The post is <b>soft-deleted locally</b> — it disappears from the app but its publication
+                rows stay as history. The <b>copies on the platforms are not deleted</b> (platform-side
+                deletion isn’t implemented on the backend yet).
+              </>
+            ) : (
+              <>Delete this draft? Nothing has been published yet, so this only removes it locally.</>
+            )
           }
           confirmLabel="Delete"
           danger
