@@ -44,3 +44,35 @@ src/
 ```
 
 `VITE_API_BASE` overrides the API base (defaults to same-origin `/api`).
+
+## Deploy (static build + nginx)
+
+```bash
+npm run build   # → dist/ — copy its contents to the web root
+```
+
+```nginx
+server {
+    listen 80;
+    server_name your.host.name;
+    root /var/www/smagent;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;   # Spring Boot
+        proxy_set_header Host $host;        # keep Origin/Host consistent, or Spring's CORS filter 403s POSTs
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;   # SPA fallback for client-side routes
+    }
+}
+```
+
+Serving under a subpath: set `base: '/<subpath>/'` in `vite.config.ts` before building.
+
+Opening `dist/index.html` via `file://` shows the UI but can't log in — the
+`SameSite=Lax` session cookie isn't sent from a `file://` origin. Without nginx,
+use any static server plus `VITE_API_BASE=http://localhost:8080/api` at build
+time and add that origin to the backend's `SMAGENT_CORS_ORIGINS`.
