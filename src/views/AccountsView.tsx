@@ -165,7 +165,11 @@ function AccountFormModal({
 
 export default function AccountsView() {
   const toast = useToast()
-  const { data, error, loading, refetch } = useApiQuery(() => accountsApi.list(), ['accounts'])
+  const [showDeleted, setShowDeleted] = useState(false)
+  const { data, error, loading, refetch } = useApiQuery(
+    () => accountsApi.list(showDeleted),
+    ['accounts', showDeleted],
+  )
   const [formOpen, setFormOpen] = useState<AccountDto | null | 'new'>(null)
   const [verifying, setVerifying] = useState<number | null>(null)
   const [deleting, setDeleting] = useState<AccountDto | null>(null)
@@ -211,25 +215,33 @@ export default function AccountsView() {
         title="Connected accounts"
         hint="credentials encrypted at rest · secrets never leave the server unmasked"
         actions={
-          <button className="btn primary" onClick={() => setFormOpen('new')}>
-            <Icon name="plus" />
-            Add account
-          </button>
+          <>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text-dim)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
+              Show deleted
+            </label>
+            <button className="btn primary" onClick={() => setFormOpen('new')}>
+              <Icon name="plus" />
+              Add account
+            </button>
+          </>
         }
       />
 
       <div className="grid cols-2">
         {accounts.map((a) => (
-          <div className="card pad" key={a.id}>
+          <div className="card pad" key={a.id} style={a.deletedAt ? { opacity: 0.55 } : undefined}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <PlatformChip platform={a.platform} lg />
               <div style={{ minWidth: 0 }}>
                 <b>{a.displayName ?? `account #${a.id}`}</b>
                 <div className="meta mono" style={{ color: 'var(--text-mute)', fontSize: 11 }}>
                   added {fmtDate(a.createdAt)}
+                  {a.deletedAt && ` · deleted ${fmtDate(a.deletedAt)}`}
                 </div>
               </div>
-              <span style={{ marginLeft: 'auto' }}>
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                {a.deletedAt && <Pill value="DRAFT" label="deleted" />}
                 <Pill value={a.status} />
               </span>
             </div>
@@ -240,21 +252,29 @@ export default function AccountsView() {
                   <span className="v mono" style={{ fontSize: 11 }}>{v}</span>
                 </div>
               ))}
+              {!Object.keys(a.credentialsMasked ?? {}).length && (
+                <span className="k">credentials</span>
+              )}
+              {!Object.keys(a.credentialsMasked ?? {}).length && (
+                <span className="v mono" style={{ fontSize: 11 }}>dropped on delete</span>
+              )}
             </div>
-            <div className="btn-row" style={{ marginTop: 12 }}>
-              <button className="btn" onClick={() => void verify(a)} disabled={verifying === a.id}>
-                {verifying === a.id ? <Spinner /> : <Icon name="refresh" />}
-                Verify
-              </button>
-              <button className="btn ghost" onClick={() => setFormOpen(a)}>
-                <Icon name="edit" />
-                Edit
-              </button>
-              <button className="btn danger" onClick={() => setDeleting(a)}>
-                <Icon name="trash" />
-                Remove
-              </button>
-            </div>
+            {!a.deletedAt && (
+              <div className="btn-row" style={{ marginTop: 12 }}>
+                <button className="btn" onClick={() => void verify(a)} disabled={verifying === a.id}>
+                  {verifying === a.id ? <Spinner /> : <Icon name="refresh" />}
+                  Verify
+                </button>
+                <button className="btn ghost" onClick={() => setFormOpen(a)}>
+                  <Icon name="edit" />
+                  Edit
+                </button>
+                <button className="btn danger" onClick={() => setDeleting(a)}>
+                  <Icon name="trash" />
+                  Remove
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {!accounts.length && (
@@ -297,8 +317,8 @@ export default function AccountsView() {
           message={
             <>
               Remove <b>{deleting.displayName ?? `account #${deleting.id}`}</b> ({PLATFORMS[deleting.platform].label})?
-              Its publication history rows are removed as well — the posts themselves stay, but you’ll no longer
-              see which account published them.
+              Its stored credentials are <b>dropped</b> and it disappears from the app — but past publication
+              history keeps the account name (the platform and name are snapshotted per attempt).
             </>
           }
           confirmLabel="Remove"
