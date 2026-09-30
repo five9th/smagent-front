@@ -8,7 +8,9 @@ export interface AccountInput {
 }
 
 export const accountsApi = {
-  list: () => api<AccountDto[]>('GET', '/social-accounts'),
+  /** Soft-deleted accounts reappear only with showDeleted=true. */
+  list: (showDeleted?: boolean) =>
+    api<AccountDto[]>('GET', `/social-accounts${showDeleted ? '?showDeleted=true' : ''}`),
 
   create: (input: AccountInput) => api<AccountDto>('POST', '/social-accounts', input),
 

@@ -11,6 +11,12 @@ export interface UserDto {
   role: string
 }
 
+/** The post's own title+text unit; media fields may land here later. */
+export interface PostContent {
+  title: string | null
+  text: string
+}
+
 export interface AccountDto {
   id: number
   platform: Platform
@@ -18,6 +24,8 @@ export interface AccountDto {
   status: AccountStatus
   credentialsMasked: Record<string, string>
   createdAt: string
+  /** Non-null once soft-deleted (only visible via ?showDeleted=true). */
+  deletedAt: string | null
 }
 
 export interface PublicationDto {
@@ -35,12 +43,16 @@ export interface PublicationDto {
 
 export interface PostDto {
   id: number
-  title: string | null
-  text: string
+  content: PostContent
   status: PostStatus
-  overrides: Partial<Record<Platform, string>>
+  /**
+   * Full replacement content per platform; at publish time each field falls
+   * back individually — override.title ?? content.title, override.text ?? content.text.
+   */
+  overrides: Partial<Record<Platform, PostContent>>
   createdAt: string
   updatedAt: string
+  deletedAt: string | null
   /** Populated on single-post GET and PUT; empty on list responses. */
   publications: PublicationDto[]
 }
@@ -67,7 +79,6 @@ export interface VerifyResult {
 }
 
 export interface PostInput {
-  title: string | null
-  text: string
-  overrides: Partial<Record<Platform, string>>
+  content: PostContent
+  overrides: Partial<Record<Platform, PostContent>>
 }
