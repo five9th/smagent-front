@@ -70,7 +70,17 @@ server {
 }
 ```
 
-Serving under a subpath: set `base: '/<subpath>/'` in `vite.config.ts` before building.
+Serving under a subpath (demo VPS layout, `https://<host>/smagent/`):
+
+```bash
+npm run build:demo   # same as `build` but with SMAGENT_BASE_PATH=/smagent/
+```
+
+Copy `dist/` to `/var/www/smagent` on the VPS and use
+[`deploy/nginx-smagent.conf`](deploy/nginx-smagent.conf). It proxies
+`/smagent/api/` → the backend with the prefix stripped, so the API stays
+same-origin and no CORS changes are needed on the backend. `SMAGENT_BASE_PATH`
+only affects asset URLs and the SPA's API base; dev on `/` is unchanged.
 
 Opening `dist/index.html` via `file://` shows the UI but can't log in — the
 `SameSite=Lax` session cookie isn't sent from a `file://` origin. Without nginx,

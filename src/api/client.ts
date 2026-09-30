@@ -15,7 +15,9 @@ export class ApiError extends Error {
 
 export const UNAUTHORIZED_EVENT = 'smagent:unauthorized'
 
-const BASE = import.meta.env.VITE_API_BASE ?? '/api'
+// Same-origin by default, relative to the app's base path (import.meta.env.BASE_URL),
+// so a deployment under e.g. /smagent/ calls /smagent/api and nginx can proxy it.
+const BASE = import.meta.env.VITE_API_BASE ?? `${import.meta.env.BASE_URL}api`
 
 export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(BASE + path, {
