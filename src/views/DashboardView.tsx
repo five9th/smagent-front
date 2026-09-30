@@ -32,7 +32,7 @@ async function loadDashboard(): Promise<DashboardData> {
   const recentPublications = details
     .filter((d): d is PostDto => d !== null)
     .flatMap((d) =>
-      d.publications.map((pub) => ({ ...pub, postTitle: titleById.get(d.id)?.title ?? null })),
+      d.publications.map((pub) => ({ ...pub, postTitle: titleById.get(d.id)?.content.title ?? null })),
     )
     .sort((a, b) => (a.publishedAt ?? a.createdAt).localeCompare(b.publishedAt ?? b.createdAt))
     .reverse()

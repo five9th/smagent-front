@@ -22,7 +22,7 @@ function PostRow({ post }: { post: PostDto }) {
     <button className="row" style={{ gridTemplateColumns: '1fr auto auto' }} onClick={() => nav(`/posts/${post.id}`)}>
       <span className={`sev ${sev}`} />
       <div style={{ minWidth: 0 }}>
-        <div className="title">{post.title ?? snippet(post.text)}</div>
+        <div className="title">{post.content.title ?? snippet(post.content.text)}</div>
         <div className="meta" style={{ marginTop: 2 }}>
           {fmtDateTime(post.updatedAt)}
           {Object.keys(post.overrides ?? {}).length ? ' · has platform overrides' : ''}
