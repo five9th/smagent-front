@@ -31,6 +31,7 @@
 .brand b { font-size: 14.5px; letter-spacing: -.02em; display: block; }
 .brand span { font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em; color: var(--gold); text-transform: uppercase; }
 .nav { padding: 10px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1; }
+.nav.nav-bottom { flex: 0; overflow: visible; border-top: 1px solid var(--line); padding-top: 8px; }
 .nav a {
   display: flex; align-items: center; gap: 11px;
   width: 100%; padding: 9px 11px; border: 0; border-radius: 10px;

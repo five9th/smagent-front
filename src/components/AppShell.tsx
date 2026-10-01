@@ -18,6 +18,7 @@ function viewTitle(pathname: string): string {
   if (pathname.startsWith('/accounts')) return 'Accounts'
   if (pathname.startsWith('/ai')) return 'AI Assistant'
   if (pathname.startsWith('/inbox')) return 'Inbox'
+  if (pathname.startsWith('/feedback')) return 'Demo feedback'
   return 'SMAgent'
 }
 
@@ -70,6 +71,12 @@ export default function AppShell() {
               <span>{item.label}</span>
             </NavLink>
           ))}
+        </nav>
+        <nav className="nav nav-bottom">
+          <NavLink to="/feedback">
+            <Icon name="feedback" />
+            <span>Demo feedback</span>
+          </NavLink>
         </nav>
         <div className="foot">
           <div className="avatar">{(user?.username ?? '?').slice(0, 1).toUpperCase()}</div>
