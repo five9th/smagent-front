@@ -1,14 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { Spinner } from '../components/ui'
+import { InlineError, Spinner } from '../components/ui'
 
 export default function LoginView() {
   const { user, ready, login } = useAuth()
   const nav = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
   const [busy, setBusy] = useState(false)
 
   if (ready && user) return <Navigate to="/" replace />
@@ -22,7 +22,7 @@ export default function LoginView() {
       await login(username.trim(), password)
       nav('/', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err)
     } finally {
       setBusy(false)
     }
@@ -61,10 +61,10 @@ export default function LoginView() {
               required
             />
           </label>
-          {error && (
-            <p className="errtext" style={{ marginTop: 0 }}>
-              {error}
-            </p>
+          {error != null && (
+            <div style={{ margin: '4px 0 10px' }}>
+              <InlineError error={error} title="Sign-in failed" />
+            </div>
           )}
           <button
             className="btn primary"

@@ -8,6 +8,7 @@ import {
   Callout,
   ConfirmModal,
   ErrorBlock,
+  InlineError,
   Loading,
   Modal,
   Pill,
@@ -16,6 +17,7 @@ import {
 } from '../components/ui'
 import { useApiQuery } from '../hooks/useApiQuery'
 import { useToast } from '../hooks/useToast'
+import { describeError } from '../lib/errors'
 import { fmtDateTime } from '../lib/format'
 import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
 
@@ -263,10 +265,10 @@ export default function PostEditorView() {
   const accountsQuery = useApiQuery(() => accountsApi.list(), ['accounts'])
 
   if (postId && postQuery.data === undefined && postQuery.error) {
-    return <ErrorBlock message={postQuery.error} onRetry={postQuery.refetch} />
+    return <ErrorBlock error={postQuery.error} onRetry={postQuery.refetch} />
   }
   if (accountsQuery.data === undefined && accountsQuery.error) {
-    return <ErrorBlock message={accountsQuery.error} onRetry={accountsQuery.refetch} />
+    return <ErrorBlock error={accountsQuery.error} onRetry={accountsQuery.refetch} />
   }
   if (postQuery.data === undefined || accountsQuery.data === undefined) return <Loading />
 
@@ -310,7 +312,7 @@ function Editor({
     accounts.filter((a) => a.status === 'ACTIVE').map((a) => a.id),
   )
   const [saving, setSaving] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<unknown>(null)
   const [publishOpen, setPublishOpen] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [results, setResults] = useState<PublishResult | null>(null)
@@ -365,9 +367,8 @@ function Editor({
       if (navigateAfterCreate) nav(`/posts/${saved.id}`, { replace: true })
       return saved
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Save failed'
-      setFormError(msg)
-      toast(msg, 'error')
+      setFormError(e)
+      toast(describeError(e), 'error')
       return null
     } finally {
       setSaving(false)
@@ -396,7 +397,7 @@ function Editor({
       if (post) refresh()
       else postsApi.get(pid).then(setCreated).catch(() => {})
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Publish failed', 'error')
+      toast(describeError(e), 'error')
     } finally {
       setPublishing(false)
     }
@@ -413,7 +414,7 @@ function Editor({
       toast('Post deleted')
       nav('/posts')
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      toast(describeError(e), 'error')
       setDeleting(false)
     }
   }
@@ -547,11 +548,7 @@ function Editor({
               </>
             )}
 
-            {formError && (
-              <p className="errtext" style={{ margin: '10px 0 0' }}>
-                {formError}
-              </p>
-            )}
+            {formError != null && <InlineError error={formError} />}
             {dirty && (
               <p className="hint" style={{ margin: '10px 0 0', color: 'var(--warn)' }}>
                 Unsaved changes.

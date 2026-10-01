@@ -6,6 +6,7 @@ import {
   Callout,
   ConfirmModal,
   ErrorBlock,
+  InlineError,
   Loading,
   Modal,
   Pill,
@@ -15,6 +16,7 @@ import {
 } from '../components/ui'
 import { useApiQuery } from '../hooks/useApiQuery'
 import { useToast } from '../hooks/useToast'
+import { describeError } from '../lib/errors'
 import { fmtDate } from '../lib/format'
 import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
 
@@ -34,7 +36,7 @@ function AccountFormModal({
   const [displayName, setDisplayName] = useState(account?.displayName ?? '')
   const [creds, setCreds] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<unknown>(null)
 
   const fields = PLATFORMS[platform].credentialFields
   const editing = account !== null
@@ -74,7 +76,7 @@ function AccountFormModal({
       }
       onSaved(!editing)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Request failed')
+      setError(e)
     } finally {
       setBusy(false)
     }
@@ -152,11 +154,7 @@ function AccountFormModal({
           field blank to keep the current ones.
         </Callout>
       )}
-      {error && (
-        <p className="errtext" style={{ margin: '10px 0 0' }}>
-          {error}
-        </p>
-      )}
+      {error != null && <InlineError error={error} />}
     </Modal>
   )
 }
@@ -182,9 +180,9 @@ export default function AccountsView() {
     try {
       const res = await accountsApi.verify(account.id)
       if (res.ok) toast(`${account.displayName ?? 'Account'} verified — ${res.message}`)
-      else toast(`Verify failed — ${res.message}`, 'error')
+      else toast({ title: 'Verification failed', detail: res.message }, 'error')
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Verify failed', 'error')
+      toast(describeError(e), 'error')
     } finally {
       setVerifying(null)
       refetch()
@@ -199,7 +197,7 @@ export default function AccountsView() {
       toast('Account deleted')
       setDeleting(null)
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Delete failed', 'error')
+      toast(describeError(e), 'error')
     } finally {
       setDeleteBusy(false)
       refetch()
@@ -207,7 +205,7 @@ export default function AccountsView() {
   }
 
   if (loading && !data) return <Loading />
-  if (error && !data) return <ErrorBlock message={error} onRetry={refetch} />
+  if (error && !data) return <ErrorBlock error={error} onRetry={refetch} />
 
   return (
     <>

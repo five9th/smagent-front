@@ -39,7 +39,7 @@ export default function PostsView() {
   const { data, error, loading, refetch } = useApiQuery(() => postsApi.list(), ['posts'])
 
   if (loading && !data) return <Loading />
-  if (error && !data) return <ErrorBlock message={error} onRetry={refetch} />
+  if (error && !data) return <ErrorBlock error={error} onRetry={refetch} />
 
   const posts = data ?? []
   const filtered = tab === 'ALL' ? posts : posts.filter((p) => p.status === tab)

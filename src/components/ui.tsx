@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import type { Platform } from '../api/types'
+import { describeError } from '../lib/errors'
 import { PLATFORMS } from '../lib/platform'
 import { Icon } from './Icon'
 
@@ -116,18 +117,35 @@ export function Loading() {
   )
 }
 
-export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorBlock({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const { title, detail } = describeError(error)
   return (
-    <div className="card pad" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <span style={{ color: 'var(--danger)', display: 'inline-flex' }}>
+    <div className="card pad" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      <span style={{ color: 'var(--danger)', display: 'inline-flex', marginTop: 1 }}>
         <Icon name="alert" />
       </span>
-      <span style={{ fontSize: 12.5, color: 'var(--text-dim)', flex: 1 }}>{message}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="errblock-title">{title}</div>
+        {detail && <div className="errblock-detail">{detail}</div>}
+      </div>
       {onRetry && (
         <button className="btn" onClick={onRetry}>
           <Icon name="refresh" /> Retry
         </button>
       )}
+    </div>
+  )
+}
+
+/** Compact inline error (forms, modals): bold title + smaller detail. */
+export function InlineError({ error, title }: { error: unknown; title?: string }) {
+  const d = describeError(error)
+  const shownTitle = title ?? d.title
+  const shownDetail = d.detail ?? (title ? d.title : undefined)
+  return (
+    <div className="errblock" role="alert">
+      <div className="errblock-title">{shownTitle}</div>
+      {shownDetail && <div className="errblock-detail">{shownDetail}</div>}
     </div>
   )
 }

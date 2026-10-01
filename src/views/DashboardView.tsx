@@ -80,7 +80,7 @@ export default function DashboardView() {
   const { data, error, loading, refetch } = useApiQuery(loadDashboard, ['dashboard'])
 
   if (loading && !data) return <Loading />
-  if (error && !data) return <ErrorBlock message={error} onRetry={refetch} />
+  if (error && !data) return <ErrorBlock error={error} onRetry={refetch} />
 
   const posts = data?.posts ?? []
   const accounts = data?.accounts ?? []

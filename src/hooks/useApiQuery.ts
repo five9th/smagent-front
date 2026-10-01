@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 interface QueryState<T> {
   data?: T
-  error?: string
+  /** Raw error (ApiError, TypeError, …) — describe by calling describeError(). */
+  error?: unknown
   loading: boolean
 }
 
@@ -33,8 +34,7 @@ export function useApiQuery<T>(fetcher: () => Promise<T>, deps: unknown[]) {
         if (alive) setState({ data, loading: false })
       })
       .catch((e: unknown) => {
-        if (alive)
-          setState({ error: e instanceof Error ? e.message : String(e), loading: false })
+        if (alive) setState({ error: e, loading: false })
       })
     return () => {
       alive = false
