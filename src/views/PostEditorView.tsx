@@ -318,6 +318,8 @@ function Editor({
   const [results, setResults] = useState<PublishResult | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  /** "Delete publications" — the backend rejects true (501) until platform-side deletion ships. */
+  const [deletePublications, setDeletePublications] = useState(false)
 
   const dirty = !readOnly && JSON.stringify(form) !== baseline
 
@@ -410,7 +412,7 @@ function Editor({
     }
     setDeleting(true)
     try {
-      await postsApi.remove(postId, readOnly ? false : undefined)
+      await postsApi.remove(postId, readOnly ? deletePublications : undefined)
       toast('Post deleted')
       nav('/posts')
     } catch (e) {
@@ -625,7 +627,13 @@ function Editor({
               >
                 {readOnly ? 'Republish…' : 'Publish…'}
               </button>
-              <button className="btn danger" onClick={() => setDeleteOpen(true)}>
+              <button
+                className="btn danger"
+                onClick={() => {
+                  setDeletePublications(false)
+                  setDeleteOpen(true)
+                }}
+              >
                 <Icon name="trash" />
                 Delete
               </button>
@@ -707,10 +715,7 @@ function Editor({
           title={readOnly ? 'Delete published post' : 'Delete draft'}
           message={
             readOnly ? (
-              <>
-                The post will disappear from the app; its history stays. Copies already posted to social
-                platforms are <b>not removed</b> — removing them automatically isn’t supported yet.
-              </>
+              <>The post will disappear from the app; its history stays.</>
             ) : (
               <>Delete this draft? Nothing was published yet, so this only removes it from the app.</>
             )
@@ -720,7 +725,27 @@ function Editor({
           busy={deleting}
           onConfirm={() => void doDelete()}
           onClose={() => setDeleteOpen(false)}
-        />
+        >
+          {readOnly && (
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'not-allowed' }}>
+                <input
+                  type="checkbox"
+                  checked={deletePublications}
+                  disabled
+                  onChange={(e) => setDeletePublications(e.target.checked)}
+                />
+                <span style={{ fontSize: 12.5 }}>
+                  Delete publications <span className="hint">(not available yet)</span>
+                </span>
+              </label>
+              <div className="callout warn sm">
+                Copies already posted to social platforms will <b>stay live</b> — remove them manually if you
+                don’t want them visible there.
+              </div>
+            </div>
+          )}
+        </ConfirmModal>
       )}
     </>
   )

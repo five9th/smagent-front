@@ -201,6 +201,7 @@ input[type=checkbox] { accent-color: var(--gold); width: 15px; height: 15px; fle
 .callout.danger { border-left-color: var(--danger); }
 .callout b { color: var(--text); }
 .callout .mono { font-size: 11px; }
+.callout.sm { padding: 8px 11px; font-size: 11.5px; }
 
 .kv { display: grid; grid-template-columns: 128px 1fr; gap: 6px 12px; font-size: 12.5px; }
 .kv .k { color: var(--text-mute); }

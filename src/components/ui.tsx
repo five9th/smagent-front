@@ -201,6 +201,7 @@ export function Modal({
 export function ConfirmModal({
   title,
   message,
+  children,
   confirmLabel = 'Confirm',
   danger,
   busy,
@@ -209,6 +210,8 @@ export function ConfirmModal({
 }: {
   title: string
   message: ReactNode
+  /** Extra body content (options, warnings) below the message. */
+  children?: ReactNode
   confirmLabel?: string
   danger?: boolean
   busy?: boolean
@@ -231,6 +234,7 @@ export function ConfirmModal({
       }
     >
       <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{message}</div>
+      {children}
     </Modal>
   )
 }
