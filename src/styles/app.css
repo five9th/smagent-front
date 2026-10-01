@@ -72,6 +72,7 @@
 .tbtn.gold { background: var(--gold); color: #1a1204; border-color: var(--gold); font-weight: 600; }
 .tbtn.gold:hover { background: var(--gold-deep); }
 .tbtn .ico { width: 15px; height: 15px; }
+.tbtn.feedback-btn { display: none; }
 
 .view { padding: 22px; overflow-y: auto; flex: 1; }
 .view-inner { max-width: 1180px; margin: 0 auto; }
@@ -310,6 +311,7 @@ input[type=checkbox] { accent-color: var(--gold); width: 15px; height: 15px; fle
   .view { padding: 16px; }
   .topbar { padding: 11px 16px; }
   .health .dot span { display: none; }
+  .tbtn.feedback-btn { display: inline-flex; }
   .composer-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 560px) {

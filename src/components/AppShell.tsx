@@ -109,6 +109,10 @@ export default function AppShell() {
             <Icon name="plus" />
             New post
           </Link>
+          {/* Desktop rail has the Demo feedback tab; on mobile this is the only entry point. */}
+          <Link className="tbtn feedback-btn" to="/feedback" title="Demo feedback" aria-label="Demo feedback">
+            <Icon name="feedback" />
+          </Link>
           <button className="tbtn" onClick={toggleTheme} title="Toggle light / dark" aria-label="Toggle theme">
             ◐
           </button>
