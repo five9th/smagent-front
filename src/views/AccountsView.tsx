@@ -85,7 +85,7 @@ function AccountFormModal({
   return (
     <Modal
       title={editing ? `Edit ${PLATFORMS[account.platform].label} account` : 'Connect social account'}
-      sub={editing ? `account #${account.id}` : 'credentials are encrypted at rest and only shown masked'}
+      sub={editing ? `account #${account.id}` : 'your credentials are stored securely and only ever shown partially'}
       onClose={busy ? undefined : onClose}
       footer={
         <>
@@ -148,10 +148,13 @@ function AccountFormModal({
           )}
         </label>
       ))}
+      <p className="hint" style={{ margin: '10px 0 0' }}>
+        Credentials are entered manually for now — other login options may be added later.
+      </p>
       {editing && (
         <Callout>
-          Updating credentials <b>replaces them all</b> and resets the account to <b>UNVERIFIED</b>. Leave every
-          field blank to keep the current ones.
+          Updating credentials <b>replaces all of them</b>, and the account will need to be verified again.
+          Leave every field blank to keep the current ones.
         </Callout>
       )}
       {error != null && <InlineError error={error} />}
@@ -179,7 +182,7 @@ export default function AccountsView() {
     setVerifying(account.id)
     try {
       const res = await accountsApi.verify(account.id)
-      if (res.ok) toast(`${account.displayName ?? 'Account'} verified — ${res.message}`)
+      if (res.ok) toast(`${account.displayName ?? 'Account'} verified successfully`)
       else toast({ title: 'Verification failed', detail: res.message }, 'error')
     } catch (e) {
       toast(describeError(e), 'error')
@@ -211,7 +214,7 @@ export default function AccountsView() {
     <>
       <SectionHead
         title="Connected accounts"
-        hint="credentials encrypted at rest · secrets never leave the server unmasked"
+        hint="your credentials are stored securely and never shown in full"
         actions={
           <>
             <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text-dim)', cursor: 'pointer' }}>
@@ -254,7 +257,7 @@ export default function AccountsView() {
                 <span className="k">credentials</span>
               )}
               {!Object.keys(a.credentialsMasked ?? {}).length && (
-                <span className="v mono" style={{ fontSize: 11 }}>dropped on delete</span>
+                <span className="v mono" style={{ fontSize: 11 }}>removed on delete</span>
               )}
             </div>
             {!a.deletedAt && (
@@ -285,17 +288,17 @@ export default function AccountsView() {
       </div>
 
       <Callout tone="warn">
-        <b>Reddit is currently unusable:</b> Reddit closed free API access, so credentials can’t be obtained
-        right now. The adapter is implemented — adding a Reddit account works, but verify/publish will fail
-        until Reddit reopens access.
+        <b>Reddit is temporarily unavailable.</b> Reddit has closed its free API, so Reddit credentials
+        can’t be set up right now. You can save a Reddit account, but connecting to it or posting to it
+        won’t work until Reddit reopens access.
       </Callout>
       <div style={{ height: 14 }} />
       <Callout>
-        <b>How verify works:</b> it performs a cheap “who am I” call against the platform and updates the
-        account status — <span className="pill p-approved"><i />active</span> when the credentials work,{' '}
-        <span className="pill p-failed"><i />invalid</span> when they don’t (with the platform’s error
-        message). Facebook verifies with a long-lived Page access token — see the backend README for the
-        walkthrough.
+        <b>What “Verify” does:</b> it checks the account against the platform right away — it turns{' '}
+        <span className="pill p-approved"><i />active</span> when the credentials work, or{' '}
+        <span className="pill p-failed"><i />invalid</span> with the platform’s error message when they
+        don’t. Facebook accounts use a long-lived Page access token — the project README explains how to
+        get one.
       </Callout>
 
       {formOpen !== null && (
@@ -315,8 +318,8 @@ export default function AccountsView() {
           message={
             <>
               Remove <b>{deleting.displayName ?? `account #${deleting.id}`}</b> ({PLATFORMS[deleting.platform].label})?
-              Its stored credentials are <b>dropped</b> and it disappears from the app — but past publication
-              history keeps the account name (the platform and name are snapshotted per attempt).
+              It will disappear from the app and its stored credentials are <b>erased</b>. Posts already
+              published through it keep their history — including which account they were posted to.
             </>
           }
           confirmLabel="Remove"

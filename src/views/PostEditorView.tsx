@@ -190,7 +190,7 @@ function PublishModal({
         </div>
         {results.postStatus === 'DRAFT' && (
           <Callout tone="warn">
-            The post stays a <b>draft</b> until at least one target succeeds — fix the errors and publish again.
+            The post stays a <b>draft</b> until at least one account succeeds — fix the errors and publish again.
           </Callout>
         )}
       </Modal>
@@ -200,7 +200,7 @@ function PublishModal({
   return (
     <Modal
       title="Publish post"
-      sub="one attempt per account — a failing target never blocks the others"
+      sub="Each account gets the post separately — if one fails, the others still go through"
       onClose={publishing ? undefined : onClose}
       footer={
         <>
@@ -483,8 +483,7 @@ function Editor({
                   />
                 </label>
                 <div className="media-drop">
-                  🖼 &nbsp;Add image / video — <b>planned</b>. The backend doesn’t accept media yet, so posts
-                  are text-only for now.
+                  🖼 &nbsp;Image and video support is coming later — posts are text-only for now.
                 </div>
               </>
             ) : (
@@ -542,8 +541,8 @@ function Editor({
                   />
                 </label>
                 <p className="hint">
-                  Each field falls back individually: an empty override title uses the generic title; the text
-                  replaces the generic text wholesale on that platform only.
+                  Leave the override title empty to reuse the generic title. The override text replaces the
+                  generic text — but only on this platform.
                 </p>
               </>
             )}
@@ -602,8 +601,7 @@ function Editor({
               </button>
             </div>
             <p className="hint" style={{ margin: '8px 0 0' }}>
-              Planned — the backend generation endpoint isn’t implemented yet.{' '}
-              <Link to="/ai">Preview the design →</Link>
+              AI text generation is on the roadmap. <Link to="/ai">See what’s coming →</Link>
             </p>
           </div>
 
@@ -634,8 +632,8 @@ function Editor({
             </div>
             <p className="hint" style={{ margin: '10px 0 0' }}>
               {readOnly
-                ? 'Delete soft-deletes the post locally; publication history is kept and platform copies stay.'
-                : 'Publish creates one attempt per selected account; the post becomes PUBLISHED once at least one target succeeds.'}
+                ? 'Deleting removes the post from the app — its history is kept, and copies already on social platforms stay.'
+                : 'Publishing sends the post to each selected account separately — it’s marked Published as soon as one of them succeeds.'}
             </p>
           </div>
         </div>
@@ -645,7 +643,7 @@ function Editor({
         <>
           <div className="section-head">
             <h2>Publication history</h2>
-            <span className="hint">every attempt, newest first</span>
+            <span className="hint">every publishing attempt, newest first</span>
           </div>
           <div className="card list">
             {current.publications.length ? (
@@ -710,12 +708,11 @@ function Editor({
           message={
             readOnly ? (
               <>
-                The post is <b>soft-deleted locally</b> — it disappears from the app but its publication
-                rows stay as history. The <b>copies on the platforms are not deleted</b> (platform-side
-                deletion isn’t implemented on the backend yet).
+                The post will disappear from the app; its history stays. Copies already posted to social
+                platforms are <b>not removed</b> — removing them automatically isn’t supported yet.
               </>
             ) : (
-              <>Delete this draft? Nothing has been published yet, so this only removes it locally.</>
+              <>Delete this draft? Nothing was published yet, so this only removes it from the app.</>
             )
           }
           confirmLabel="Delete"

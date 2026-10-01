@@ -38,7 +38,7 @@ export default function LoginView() {
             <span>Social Agent</span>
           </div>
         </div>
-        <p className="login-sub">Sign in with your owner account.</p>
+        <p className="login-sub">Sign in to SMAgent.</p>
         <form onSubmit={onSubmit}>
           <label className="field">
             <span className="lab">Username</span>

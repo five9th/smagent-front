@@ -14,7 +14,7 @@ export default function InboxView() {
     <>
       <SectionHead
         title="Engagement inbox"
-        hint={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>backend not implemented — preview only <Pill value="PLANNED" /></span>}
+        hint={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>planned — not available yet <Pill value="PLANNED" /></span>}
       />
 
       <div className="tabs">
@@ -30,21 +30,18 @@ export default function InboxView() {
           <span style={{ display: 'inline-block' }}>
             <Icon name="inbox" className="ico" />
           </span>
-          <div>Nothing here yet — engagement tracking hasn’t landed.</div>
+          <div>Nothing here yet — this feature is still in the works.</div>
         </div>
       </div>
 
       <div className="grid cols-2" style={{ marginTop: 16 }}>
         <Callout>
-          <b>How it will work.</b> Polling, not webhooks — Facebook Page webhooks require a public callback
-          URL and app review, while polling the Graph API on demand needs neither. Each sync pulls comments
-          and reactions per publication, stores them as events and updates counters. Webhooks remain a
-          future upgrade once the app is reachable on a public domain.
+          <b>How it will work.</b> SMAgent will regularly check your connected platforms and collect new
+          comments and reactions for you — no public server or special platform permissions needed.
         </Callout>
         <Callout>
-          <b>What you’ll see.</b> A flat feed across all published posts — new comments and reactions with
-          author, text and platform timestamp — plus per-publication counters (comments, reactions,
-          last synced). A “Sync all” action will pull every successful publication of every active account.
+          <b>What you’ll see.</b> One feed of comments and reactions across all your published posts, with
+          counts per post and a “check everything now” action.
         </Callout>
       </div>
     </>

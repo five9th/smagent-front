@@ -17,7 +17,7 @@ function ProvidersTab() {
     <>
       <SectionHead
         title="AI providers"
-        hint="exactly one provider is active at a time"
+        hint="keep several providers and switch the active one anytime"
         actions={
           <span className="dim">
             <button className="btn primary" disabled>
@@ -65,9 +65,8 @@ function ProvidersTab() {
               <span className="sv">200.5k</span>
             </div>
             <p className="hint" style={{ margin: '4px 0 0' }}>
-              152.3k in / 48.2k out · 37 requests · <b>source: LOCAL</b> — “remaining credits” is only
-              available for some providers (OpenRouter-style) and will be labelled{' '}
-              <b>source: PROVIDER</b>.
+              152.3k in · 48.2k out · 37 requests — usage is tracked automatically; “remaining credits”
+              appears only for providers that report it.
             </p>
           </div>
           <div className="btn-row dim" style={{ marginTop: 12 }}>
@@ -90,31 +89,22 @@ function ProvidersTab() {
             Supported provider types
           </div>
           <div className="kv" style={{ gridTemplateColumns: '180px 1fr' }}>
-            <span className="k">ANTHROPIC</span>
-            <span>
-              Anthropic native API — <span className="mono" style={{ fontSize: 11 }}>api.anthropic.com</span>,{' '}
-              <span className="mono" style={{ fontSize: 11 }}>x-api-key</span>
-            </span>
-            <span className="k">OPENAI_COMPATIBLE</span>
-            <span>
-              OpenAI, OpenRouter, Groq, Mistral, DeepSeek, local Ollama… — chat-completions via a
-              configurable <span className="mono" style={{ fontSize: 11 }}>baseUrl</span>
-            </span>
+            <span className="k">Anthropic</span>
+            <span>Claude models via Anthropic’s own API</span>
+            <span className="k">OpenAI-compatible</span>
+            <span>OpenAI, OpenRouter, Groq, Mistral, DeepSeek, local Ollama and more</span>
           </div>
           <div style={{ marginTop: 14 }} className="callout">
-            API keys will be stored encrypted and masked in responses — exactly like social account
-            credentials today.
+            API keys will be stored securely and never shown in full — just like your social account
+            credentials.
           </div>
         </div>
       </div>
 
       <div style={{ height: 14 }} />
       <Callout tone="warn">
-        <b>Not implemented yet.</b> This tab previews the planned UI. The backend will expose:{' '}
-        <span className="mono">
-          GET/POST /api/ai-providers · PUT/DELETE /api/ai-providers/&#123;id&#125; · verify · activate · models
-          · usage
-        </span>
+        <b>Not available yet.</b> This is a preview: connect several AI providers, mark one active, and
+        keep an eye on token usage.
       </Callout>
     </>
   )
@@ -196,9 +186,9 @@ function GenerateTab() {
               ))}
             </div>
             <p className="hint" style={{ margin: '8px 0 0' }}>
-              The platform shapes the system prompt ({PLATFORMS[platform].label}:{' '}
-              {PLATFORMS[platform].requiresTitle ? 'title + body' : 'body only'}, ~
-              {PLATFORMS[platform].maxLength.toLocaleString('en-US')} chars).
+              Generated text is written to fit the platform — {PLATFORMS[platform].label}:{' '}
+              {PLATFORMS[platform].requiresTitle ? 'a title plus the body' : 'just the body'}, up to ~
+              {PLATFORMS[platform].maxLength.toLocaleString('en-US')} characters.
             </p>
           </div>
 
@@ -207,18 +197,16 @@ function GenerateTab() {
               Planned flow
             </div>
             <p className="hint" style={{ margin: 0 }}>
-              Generate → preview → edit here → “Send to composer”. The result is never auto-saved as a
-              post. A multi-turn chat mode (stateless — the frontend owns history) will refine the draft:
-              “shorter”, “add an emoji”, …
+              Generate → preview → edit → send to the composer. Nothing is ever posted automatically.
+              You’ll also be able to refine a draft in a short chat: “shorter”, “add an emoji”, …
             </p>
           </div>
         </div>
       </div>
       <div style={{ height: 14 }} />
       <Callout tone="warn">
-        <b>Not implemented yet.</b> The backend will expose <span className="mono">POST /api/ai/generate</span>{' '}
-        and <span className="mono">POST /api/ai/chat</span>; failures surface as 502 with the upstream
-        message.
+        <b>Not available yet.</b> Once it’s here, you’ll draft with your chosen provider and tweak the
+        result before it ever reaches a platform.
       </Callout>
     </>
   )
@@ -230,7 +218,7 @@ export default function AiView() {
     <>
       <SectionHead
         title="AI Assistant"
-        hint={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>backend not implemented — preview only <Pill value="PLANNED" /></span>}
+        hint={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>planned — not available yet <Pill value="PLANNED" /></span>}
       />
       <div className="tabs">
         <button className={tab === 'providers' ? 'active' : ''} onClick={() => setTab('providers')}>

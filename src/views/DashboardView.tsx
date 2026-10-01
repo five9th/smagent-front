@@ -168,18 +168,17 @@ export default function DashboardView() {
           </div>
           <div className="card pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Callout>
-              <b>Compose once, publish everywhere.</b> Write a post, optionally tailor the text per
-              platform, pick target accounts and publish — one attempt per account, results shown
-              per target. <Link to="/posts/new">Create a post →</Link>
+              <b>Compose once, publish everywhere.</b> Write a post, tailor the text per platform if you
+              like, pick the accounts and publish — each account is handled separately, and failures are
+              reported one by one. <Link to="/posts/new">Create a post →</Link>
             </Callout>
             <Callout>
-              <b>AI assistance is on the way.</b> Provider management, token usage and text
-              generation are designed but not implemented on the backend yet.{' '}
-              <Link to="/ai">Preview the AI panel →</Link>
+              <b>AI assistance is on the way.</b> You’ll be able to connect AI providers, switch between
+              them, and draft post text with AI. <Link to="/ai">See what’s coming →</Link>
             </Callout>
             <Callout tone="warn">
-              <b>Engagement inbox is coming too.</b> Comment and reaction tracking will land as
-              polling-based sync. <Link to="/inbox">Preview the inbox →</Link>
+              <b>An engagement inbox is coming too</b> — comments and reactions on your posts, gathered
+              in one place. <Link to="/inbox">See what’s coming →</Link>
             </Callout>
           </div>
         </div>
