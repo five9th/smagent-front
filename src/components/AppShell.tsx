@@ -3,6 +3,7 @@ import { accountsApi } from '../api/accounts'
 import { useApiQuery } from '../hooks/useApiQuery'
 import { useAuth } from '../hooks/useAuth'
 import { Icon, type IconName } from './Icon'
+import { VersionLine } from './VersionLine'
 
 const NAV: Array<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: 'Dashboard', icon: 'dashboard' },
@@ -88,6 +89,7 @@ export default function AppShell() {
             <Icon name="logout" />
           </button>
         </div>
+        <VersionLine />
       </aside>
 
       <div className="main">

@@ -49,6 +49,9 @@
 .rail .foot .who span { font-size: 10.5px; color: var(--text-mute); }
 .avatar { width: 28px; height: 28px; border-radius: 8px; background: var(--gold-soft); color: var(--gold); display: grid; place-items: center; font-weight: 700; font-size: 12px; flex: none; }
 
+.versions { padding: 0 14px 12px; font-size: 10px; color: var(--text-mute); line-height: 1.7; letter-spacing: .02em; }
+.versions div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .main { min-width: 0; display: flex; flex-direction: column; height: 100%; }
 .topbar {
   display: flex; align-items: center; gap: 14px;

@@ -1,38 +1,44 @@
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// The SPA calls same-origin /api and Vite's dev server forwards it to the
-// Spring Boot backend. Override the target with SMAGENT_BACKEND_URL when it
-// doesn't run on localhost:8080.
-// Public deployment path (e.g. SMAGENT_BASE_PATH=/smagent/ for nginx under a
-// sub-path). Must have leading and trailing slashes. Dev default is '/'.
-const basePath = process.env.SMAGENT_BASE_PATH ?? '/'
+// Frontend build version: package.json version + git commit, baked in at
+// dev-server start / build time and displayed in the app (see AppShell).
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'))
+const gitHash = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim()
+  } catch {
+    return 'dev' // not a git checkout (e.g. exported tarball)
+  }
+})()
 
 // The SPA calls same-origin /api and Vite's dev server forwards it to the
 // Spring Boot backend. Override the target with SMAGENT_BACKEND_URL when it
 // doesn't run on localhost:8080.
-const proxyCommon = {
-  target: process.env.SMAGENT_BACKEND_URL ?? 'http://localhost:8080',
-  changeOrigin: true,
-  // Chrome sends `Origin: http://localhost:<vite-port>` even on same-origin
-  // POSTs; Spring's CORS filter 403s any origin outside its allowlist
-  // (default: :5173). Drop it so any dev port works through the proxy.
-  configure: (proxy: { on: (event: string, cb: (req: { removeHeader: (h: string) => void }) => void) => void }) => {
-    proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('Origin'))
-  },
-}
-
 export default defineConfig({
-  base: basePath,
   plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(`${pkg.version}+${gitHash}`),
+  },
   server: {
     proxy: {
-      // When running with a base path the SPA requests `${basePath}api`;
-      // strip the prefix so the backend still sees its normal /api routes.
-      ...(basePath === '/'
-        ? {}
-        : { [`${basePath}api`]: { ...proxyCommon, rewrite: (p: string) => p.slice(basePath.length - 1) } }),
-      '/api': proxyCommon,
+      '/api': {
+        target: process.env.SMAGENT_BACKEND_URL ?? 'http://localhost:8080',
+        changeOrigin: true,
+        // Chrome sends `Origin: http://localhost:<vite-port>` even on same-origin
+        // POSTs; Spring's CORS filter 403s any origin outside its allowlist
+        // (default: :5173). Drop it so any dev port works through the proxy.
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('Origin'))
+        },
+      },
+      // Backend build info (/actuator/info, public) for the version display.
+      '/actuator': {
+        target: process.env.SMAGENT_BACKEND_URL ?? 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 })
