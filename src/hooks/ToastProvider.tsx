@@ -42,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toast-wrap">
         {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.tone === 'error' ? 'error' : ''}`}>
+          <div key={t.id} className={`toast ${t.tone !== 'ok' ? t.tone : ''}`}>
             <ToastBody msg={t.msg} />
           </div>
         ))}

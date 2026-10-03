@@ -2,7 +2,7 @@
 
 export type Platform = 'FACEBOOK' | 'REDDIT'
 export type AccountStatus = 'UNVERIFIED' | 'ACTIVE' | 'INVALID'
-export type PostStatus = 'DRAFT' | 'PUBLISHED'
+export type PostStatus = 'DRAFT' | 'PARTIALLY_PUBLISHED' | 'PUBLISHED'
 export type PublicationStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
 
 export interface UserDto {
@@ -68,6 +68,7 @@ export interface PublishTargetResult {
 
 export interface PublishResult {
   postId: number
+  /** PUBLISHED when every target succeeded, PARTIALLY_PUBLISHED when some did, DRAFT when none. */
   postStatus: PostStatus
   results: PublishTargetResult[]
 }

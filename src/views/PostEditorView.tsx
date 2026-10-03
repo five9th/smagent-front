@@ -188,6 +188,12 @@ function PublishModal({
             </div>
           ))}
         </div>
+        {results.postStatus === 'PARTIALLY_PUBLISHED' && (
+          <Callout tone="warn">
+            <b>Partially published.</b> Publish again to reach the remaining accounts — a fully successful
+            round upgrades the post to <b>Published</b>.
+          </Callout>
+        )}
         {results.postStatus === 'DRAFT' && (
           <Callout tone="warn">
             The post stays a <b>draft</b> until at least one account succeeds — fix the errors and publish again.
@@ -302,7 +308,7 @@ function Editor({
   const [created, setCreated] = useState<PostDto | null>(null)
   const current = post ?? created
   const postId = current?.id ?? null
-  const readOnly = current?.status === 'PUBLISHED'
+  const readOnly = current != null && current.status !== 'DRAFT'
 
   const [form, setForm] = useState<FormState>(() => (post ? formFromPost(post) : EMPTY_FORM))
   const [baseline, setBaseline] = useState<string>(() => JSON.stringify(post ? formFromPost(post) : EMPTY_FORM))
@@ -388,13 +394,21 @@ function Editor({
       }
       const res = await postsApi.publish(pid, targets)
       setResults(res)
+      const total = res.results.length
       const ok = res.results.filter((r) => r.status === 'SUCCESS').length
-      toast(
-        ok
-          ? `Published to ${ok}/${res.results.length} account${res.results.length === 1 ? '' : 's'}`
-          : 'Publish failed on all targets — see details',
-        ok ? 'ok' : 'error',
-      )
+      if (res.postStatus === 'PUBLISHED') {
+        toast(total === 1 ? 'Published' : `Published to all ${total} accounts`)
+      } else if (res.postStatus === 'PARTIALLY_PUBLISHED') {
+        toast(
+          {
+            title: 'Partially published',
+            detail: `${ok} of ${total} accounts have it — publish again to the rest.`,
+          },
+          'warn',
+        )
+      } else {
+        toast({ title: 'Not published', detail: 'All targets failed — see details.' }, 'error')
+      }
       // Refresh the post (status may have flipped to PUBLISHED, new attempt rows).
       if (post) refresh()
       else postsApi.get(pid).then(setCreated).catch(() => {})
@@ -438,9 +452,18 @@ function Editor({
       </div>
 
       {readOnly && (
-        <Callout tone="warn">
-          <b>This post is published and locked.</b> Only DRAFT posts can be edited. Republishing pushes the
-          same content to accounts again (a natural retry) and adds new attempt rows to the history below.
+        <Callout tone={current.status === 'PARTIALLY_PUBLISHED' ? 'warn' : 'gold'}>
+          {current.status === 'PARTIALLY_PUBLISHED' ? (
+            <>
+              <b>Only some accounts have this post so far.</b> Editing is locked — publish again to the
+              missing accounts; a round where every target succeeds upgrades the post to Published.
+            </>
+          ) : (
+            <>
+              <b>This post is published and locked.</b> Republishing pushes the same content to accounts
+              again and adds new attempt rows to the history below.
+            </>
+          )}
         </Callout>
       )}
 
@@ -712,7 +735,13 @@ function Editor({
 
       {deleteOpen && (
         <ConfirmModal
-          title={readOnly ? 'Delete published post' : 'Delete draft'}
+          title={
+            current?.status === 'PARTIALLY_PUBLISHED'
+              ? 'Delete partially published post'
+              : readOnly
+                ? 'Delete published post'
+                : 'Delete draft'
+          }
           message={
             readOnly ? (
               <>The post will disappear from the app; its history stays.</>

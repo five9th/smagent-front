@@ -1,7 +1,7 @@
 import { createContext } from 'react'
 import type { DescribedError } from '../lib/errors'
 
-export type ToastTone = 'ok' | 'error'
+export type ToastTone = 'ok' | 'warn' | 'error'
 
 /** A toast body: plain text, or a structured {title, detail} pair. */
 export type ToastInput = string | DescribedError

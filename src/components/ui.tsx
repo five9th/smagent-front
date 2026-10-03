@@ -8,6 +8,7 @@ import { Icon } from './Icon'
 
 const PILL_CLASS: Record<string, string> = {
   DRAFT: 'p-draft',
+  PARTIALLY_PUBLISHED: 'p-partial',
   PUBLISHED: 'p-published',
   PENDING: 'p-submitted',
   SUCCESS: 'p-approved',

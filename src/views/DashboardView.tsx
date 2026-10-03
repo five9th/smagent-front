@@ -23,8 +23,8 @@ interface DashboardData {
 async function loadDashboard(): Promise<DashboardData> {
   const [posts, accounts] = await Promise.all([postsApi.list(), accountsApi.list()])
   // Publications are only included on single-post GETs (and /api/publications
-  // requires postId), so fan out over the newest published posts.
-  const newestPublished = posts.filter((p) => p.status === 'PUBLISHED').slice(0, 5)
+  // requires postId), so fan out over the newest posts that went out at all.
+  const newestPublished = posts.filter((p) => p.status !== 'DRAFT').slice(0, 5)
   const details = await Promise.all(
     newestPublished.map((p) => postsApi.get(p.id).catch(() => null)),
   )
@@ -85,7 +85,8 @@ export default function DashboardView() {
   const posts = data?.posts ?? []
   const accounts = data?.accounts ?? []
   const drafts = posts.filter((p) => p.status === 'DRAFT').length
-  const published = posts.length - drafts
+  const partial = posts.filter((p) => p.status === 'PARTIALLY_PUBLISHED').length
+  const published = posts.length - drafts - partial
   const active = accounts.filter((a) => a.status === 'ACTIVE').length
   const attention = accounts.length - active
   const hasAccounts = accounts.length > 0
@@ -102,7 +103,12 @@ export default function DashboardView() {
 
       <div className="grid cols-4" style={{ marginBottom: 8 }}>
         <Tile label="Drafts" value={drafts} tone="gold" sub={drafts ? 'awaiting publish' : 'queue clear'} />
-        <Tile label="Published" value={published} tone="ok" sub="saved with full history" />
+        <Tile
+          label="Published"
+          value={published}
+          tone="ok"
+          sub={partial ? `${partial} partially published` : 'saved with full history'}
+        />
         <Tile
           label="Active accounts"
           value={`${active}/${accounts.length}`}

@@ -2,8 +2,8 @@ import { api } from './client'
 import type { PostDto, PostInput, PublicationDto, PublishResult } from './types'
 
 export const postsApi = {
-  /** All posts, newest first; omit status to get both DRAFT and PUBLISHED. */
-  list: (status?: 'DRAFT' | 'PUBLISHED', showDeleted?: boolean) =>
+  /** All posts, newest first; omit status to get every non-deleted post. */
+  list: (status?: 'DRAFT' | 'PARTIALLY_PUBLISHED' | 'PUBLISHED', showDeleted?: boolean) =>
     api<PostDto[]>('GET', `/posts${buildQuery({ status, showDeleted })}`),
 
   get: (id: number) => api<PostDto>('GET', `/posts/${id}`),
