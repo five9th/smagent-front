@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { accountsApi, type AccountInput } from '../api/accounts'
-import type { AccountDto, Platform } from '../api/types'
+import type { AccountDto, AuthMethod, Platform } from '../api/types'
 import { Icon } from '../components/Icon'
 import {
   Callout,
@@ -18,7 +18,7 @@ import { useApiQuery } from '../hooks/useApiQuery'
 import { useToast } from '../hooks/useToast'
 import { describeError } from '../lib/errors'
 import { fmtDate } from '../lib/format'
-import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
+import { AUTH_METHOD_LABELS, PLATFORMS, PLATFORM_LIST, defaultLoginOption } from '../lib/platform'
 
 /* --- Add / edit modal ------------------------------------------------------ */
 
@@ -33,30 +33,42 @@ function AccountFormModal({
 }) {
   const toast = useToast()
   const [platform, setPlatform] = useState<Platform>(account?.platform ?? 'FACEBOOK')
+  const [authMethod, setAuthMethod] = useState<AuthMethod>(
+    account?.authMethod ?? defaultLoginOption('FACEBOOK').authMethod,
+  )
   const [displayName, setDisplayName] = useState(account?.displayName ?? '')
   const [creds, setCreds] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
-  const fields = PLATFORMS[platform].credentialFields
+  const loginOption = PLATFORMS[platform].loginOptions.find((o) => o.authMethod === authMethod)
+    ?? defaultLoginOption(platform)
+  const fields = loginOption.fields
   const editing = account !== null
+  /** Switching the login option requires entering new credentials (backend rule). */
+  const methodChanged = editing && authMethod !== account.authMethod
 
   const submit = async () => {
     setError(null)
     try {
       if (editing) {
-        // PUT: displayName and/or credentials; credentials are replaced wholesale.
+        // PUT: displayName and/or credentials; credentials are replaced wholesale,
+        // and the login option may only be switched together with new credentials.
         const filled = Object.fromEntries(
           fields.filter((f) => (creds[f.key] ?? '').trim() !== '').map((f) => [f.key, creds[f.key].trim()]),
         ) as Record<string, string>
         const anyFilled = Object.keys(filled).length > 0
+        if (methodChanged && !anyFilled) {
+          setError(`Switching the login option needs the new credentials — fill in “${fields[0].label}” and the rest.`)
+          return
+        }
         if (anyFilled && Object.keys(filled).length < fields.length) {
           setError('Fill in every credential field — updating credentials replaces them all at once.')
           return
         }
         await accountsApi.update(account.id, {
           displayName: displayName.trim() || undefined,
-          ...(anyFilled ? { credentials: filled } : {}),
+          ...(anyFilled || methodChanged ? { credentials: filled, authMethod } : {}),
         })
         toast(anyFilled ? 'Account updated — status reset to UNVERIFIED, verify it again' : 'Account updated')
       } else {
@@ -68,11 +80,16 @@ function AccountFormModal({
         }
         const input: AccountInput = {
           platform,
+          authMethod,
           credentials: Object.fromEntries(fields.map((f) => [f.key, creds[f.key].trim()])),
           ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
         }
         await accountsApi.create(input)
-        toast(`${PLATFORMS[platform].label} account added — verify it to activate`)
+        toast(
+          loginOption.canPublish
+            ? `${PLATFORMS[platform].label} account added — verify it to activate`
+            : `${PLATFORMS[platform].label} link added — publishing will open it for you to post by hand`,
+        )
       }
       onSaved(!editing)
     } catch (e) {
@@ -104,7 +121,9 @@ function AccountFormModal({
           value={platform}
           disabled={editing}
           onChange={(e) => {
-            setPlatform(e.target.value as Platform)
+            const next = e.target.value as Platform
+            setPlatform(next)
+            setAuthMethod(defaultLoginOption(next).authMethod)
             setCreds({})
           }}
         >
@@ -114,6 +133,28 @@ function AccountFormModal({
             </option>
           ))}
         </select>
+      </label>
+      <label className="field">
+        <span className="lab">Login option</span>
+        <select
+          value={authMethod}
+          onChange={(e) => {
+            setAuthMethod(e.target.value as AuthMethod)
+            setCreds({})
+          }}
+        >
+          {PLATFORMS[platform].loginOptions.map((o) => (
+            <option key={o.authMethod} value={o.authMethod}>
+              {AUTH_METHOD_LABELS[o.authMethod]}
+              {o.canPublish ? '' : ' (manual)'}
+            </option>
+          ))}
+        </select>
+        {!loginOption.canPublish && (
+          <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+            No automatic posting with this option — the account is a link you open to create posts by hand.
+          </span>
+        )}
       </label>
       <label className="field">
         <span className="lab">Display name (optional — filled by verify)</span>
@@ -154,7 +195,8 @@ function AccountFormModal({
       {editing && (
         <Callout>
           Updating credentials <b>replaces all of them</b>, and the account will need to be verified again.
-          Leave every field blank to keep the current ones.
+          Leave every field blank to keep the current ones — but switching the login option always requires
+          the new credentials.
         </Callout>
       )}
       {error != null && <InlineError error={error} />}
@@ -237,11 +279,12 @@ export default function AccountsView() {
               <div style={{ minWidth: 0 }}>
                 <b>{a.displayName ?? `account #${a.id}`}</b>
                 <div className="meta mono" style={{ color: 'var(--text-mute)', fontSize: 11 }}>
-                  added {fmtDate(a.createdAt)}
+                  via {AUTH_METHOD_LABELS[a.authMethod].toLowerCase()} · added {fmtDate(a.createdAt)}
                   {a.deletedAt && ` · deleted ${fmtDate(a.deletedAt)}`}
                 </div>
               </div>
               <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                {!a.canPublish && <Pill value="MANUAL" />}
                 {a.deletedAt && <Pill value="DRAFT" label="deleted" />}
                 <Pill value={a.status} />
               </span>

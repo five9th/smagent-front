@@ -1,8 +1,10 @@
 // DTOs mirroring the backend API (see smagent/docs/API.md).
 
-export type Platform = 'FACEBOOK' | 'REDDIT'
+export type Platform = 'FACEBOOK' | 'REDDIT' | 'X' | 'LINKEDIN'
+
+export type AuthMethod = 'PAGE_ACCESS_TOKEN' | 'PASSWORD_GRANT' | 'PROFILE_URL'
 export type AccountStatus = 'UNVERIFIED' | 'ACTIVE' | 'INVALID'
-export type PostStatus = 'DRAFT' | 'PARTIALLY_PUBLISHED' | 'PUBLISHED'
+export type PostStatus = 'DRAFT' | 'PUBLISHED'
 export type PublicationStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
 
 export interface UserDto {
@@ -20,6 +22,9 @@ export interface PostContent {
 export interface AccountDto {
   id: number
   platform: Platform
+  authMethod: AuthMethod
+  /** False for manual login options (PROFILE_URL) — no platform API access. */
+  canPublish: boolean
   displayName: string | null
   status: AccountStatus
   credentialsMasked: Record<string, string>
@@ -68,7 +73,6 @@ export interface PublishTargetResult {
 
 export interface PublishResult {
   postId: number
-  /** PUBLISHED when every target succeeded, PARTIALLY_PUBLISHED when some did, DRAFT when none. */
   postStatus: PostStatus
   results: PublishTargetResult[]
 }

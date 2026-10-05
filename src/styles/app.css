@@ -113,7 +113,7 @@
 .p-approved { color: var(--ok); background: var(--ok-soft); }
 .p-scheduled{ color: var(--gold); background: var(--gold-soft); }
 .p-published{ color: var(--ok); background: var(--ok-soft); }
-.p-partial  { color: var(--warn); background: var(--warn-soft); }
+.p-manual   { color: var(--warn); background: var(--warn-soft); }
 .p-failed   { color: var(--danger); background: var(--danger-soft); }
 
 .list { display: flex; flex-direction: column; }
@@ -141,6 +141,8 @@
 .chan.lg .g { width: 26px; height: 26px; border-radius: 7px; font-size: 13px; }
 .g-facebook { background: #6a8dd8; }
 .g-reddit { background: #ff8a4c; }
+.g-x { background: #cfd3da; }
+.g-linkedin { background: #4c9fd6; }
 
 .btn {
   border: 1px solid var(--line-str); background: var(--surface-2); color: var(--text);

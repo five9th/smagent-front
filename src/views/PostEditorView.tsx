@@ -9,6 +9,7 @@ import {
   ConfirmModal,
   ErrorBlock,
   InlineError,
+  Linkify,
   Loading,
   Modal,
   Pill,
@@ -19,7 +20,7 @@ import { useApiQuery } from '../hooks/useApiQuery'
 import { useToast } from '../hooks/useToast'
 import { describeError } from '../lib/errors'
 import { fmtDateTime } from '../lib/format'
-import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
+import { PLATFORMS, PUBLISHABLE_PLATFORMS } from '../lib/platform'
 
 type Tab = 'GENERIC' | Platform
 
@@ -35,25 +36,21 @@ interface FormState {
   ovr: Record<Platform, OverrideForm>
 }
 
-const EMPTY_FORM: FormState = {
-  title: '',
-  text: '',
-  ovr: {
-    FACEBOOK: { on: false, title: '', text: '' },
-    REDDIT: { on: false, title: '', text: '' },
-  },
+function emptyOvr(): Record<Platform, OverrideForm> {
+  return Object.fromEntries(
+    PUBLISHABLE_PLATFORMS.map((p) => [p, { on: false, title: '', text: '' }]),
+  ) as Record<Platform, OverrideForm>
 }
 
+const EMPTY_FORM: FormState = { title: '', text: '', ovr: emptyOvr() }
+
 function formFromPost(post: PostDto): FormState {
-  const ovr = (p: Platform): OverrideForm => {
+  const ovr = emptyOvr()
+  for (const p of PUBLISHABLE_PLATFORMS) {
     const o = post.overrides?.[p]
-    return o ? { on: true, title: o.title ?? '', text: o.text } : { on: false, title: '', text: '' }
+    if (o) ovr[p] = { on: true, title: o.title ?? '', text: o.text }
   }
-  return {
-    title: post.content.title ?? '',
-    text: post.content.text,
-    ovr: { FACEBOOK: ovr('FACEBOOK'), REDDIT: ovr('REDDIT') },
-  }
+  return { title: post.content.title ?? '', text: post.content.text, ovr }
 }
 
 /** Per-field fallback exactly as the backend resolves at publish time. */
@@ -97,7 +94,7 @@ function PreviewCard({
           <div className="pt">{meta.label} · preview</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          {PLATFORM_LIST.map((p) => (
+          {PUBLISHABLE_PLATFORMS.map((p) => (
             <button
               key={p}
               className="btn ghost"
@@ -173,7 +170,7 @@ function PublishModal({
                 </div>
                 {r.errorMessage && (
                   <div className="errtext" style={{ marginTop: 3 }}>
-                    {r.errorMessage}
+                    <Linkify text={r.errorMessage} />
                   </div>
                 )}
               </div>
@@ -188,12 +185,6 @@ function PublishModal({
             </div>
           ))}
         </div>
-        {results.postStatus === 'PARTIALLY_PUBLISHED' && (
-          <Callout tone="warn">
-            <b>Partially published.</b> Publish again to reach the remaining accounts — a fully successful
-            round upgrades the post to <b>Published</b>.
-          </Callout>
-        )}
         {results.postStatus === 'DRAFT' && (
           <Callout tone="warn">
             The post stays a <b>draft</b> until at least one account succeeds — fix the errors and publish again.
@@ -230,7 +221,7 @@ function PublishModal({
       ) : (
         <div className="list" style={{ marginTop: -6 }}>
           {chosen.map((a) => {
-            const usesOverride = form.ovr[a.platform].on
+            const usesOverride = form.ovr[a.platform]?.on
             return (
               <div key={a.id} className="row plain" style={{ gridTemplateColumns: '1fr auto', padding: '11px 0' }}>
                 <div>
@@ -239,7 +230,9 @@ function PublishModal({
                     <span>{a.displayName ?? `account #${a.id}`}</span>
                   </div>
                   <div className="meta" style={{ marginTop: 2 }}>
-                    will receive: {usesOverride ? `${PLATFORMS[a.platform].label} override` : 'generic text'}
+                    {!a.canPublish
+                      ? 'manual — publishing gives you a link to create the post there by hand'
+                      : `will receive: ${usesOverride ? `${PLATFORMS[a.platform].label} override` : 'generic text'}`}
                     {a.status !== 'ACTIVE' && ` · account is ${a.status.toLowerCase()} (verify it first?)`}
                   </div>
                 </div>
@@ -308,7 +301,7 @@ function Editor({
   const [created, setCreated] = useState<PostDto | null>(null)
   const current = post ?? created
   const postId = current?.id ?? null
-  const readOnly = current != null && current.status !== 'DRAFT'
+  const readOnly = current?.status === 'PUBLISHED'
 
   const [form, setForm] = useState<FormState>(() => (post ? formFromPost(post) : EMPTY_FORM))
   const [baseline, setBaseline] = useState<string>(() => JSON.stringify(post ? formFromPost(post) : EMPTY_FORM))
@@ -343,14 +336,14 @@ function Editor({
       setFormError('Post text is required.')
       return null
     }
-    for (const p of PLATFORM_LIST) {
+    for (const p of PUBLISHABLE_PLATFORMS) {
       if (form.ovr[p].on && !form.ovr[p].text.trim()) {
         setFormError(`The ${PLATFORMS[p].label} override needs its own text (or disable it).`)
         return null
       }
     }
     const overrides: Partial<Record<Platform, PostContent>> = {}
-    for (const p of PLATFORM_LIST) {
+    for (const p of PUBLISHABLE_PLATFORMS) {
       if (form.ovr[p].on) {
         overrides[p] = { title: form.ovr[p].title.trim() || null, text: form.ovr[p].text }
       }
@@ -397,17 +390,12 @@ function Editor({
       const total = res.results.length
       const ok = res.results.filter((r) => r.status === 'SUCCESS').length
       if (res.postStatus === 'PUBLISHED') {
-        toast(total === 1 ? 'Published' : `Published to all ${total} accounts`)
-      } else if (res.postStatus === 'PARTIALLY_PUBLISHED') {
-        toast(
-          {
-            title: 'Partially published',
-            detail: `${ok} of ${total} accounts have it — publish again to the rest.`,
-          },
-          'warn',
-        )
+        toast(total === 1 ? 'Published' : `Published to ${ok}/${total} accounts`)
       } else {
-        toast({ title: 'Not published', detail: 'All targets failed — see details.' }, 'error')
+        toast(
+          { title: 'Not published anywhere yet', detail: 'Open the details — failed targets may carry a link for posting by hand.' },
+          'error',
+        )
       }
       // Refresh the post (status may have flipped to PUBLISHED, new attempt rows).
       if (post) refresh()
@@ -452,18 +440,9 @@ function Editor({
       </div>
 
       {readOnly && (
-        <Callout tone={current.status === 'PARTIALLY_PUBLISHED' ? 'warn' : 'gold'}>
-          {current.status === 'PARTIALLY_PUBLISHED' ? (
-            <>
-              <b>Only some accounts have this post so far.</b> Editing is locked — publish again to the
-              missing accounts; a round where every target succeeds upgrades the post to Published.
-            </>
-          ) : (
-            <>
-              <b>This post is published and locked.</b> Republishing pushes the same content to accounts
-              again and adds new attempt rows to the history below.
-            </>
-          )}
+        <Callout tone="gold">
+          <b>This post is published and locked.</b> Republishing pushes the same content to accounts
+          again and adds new attempt rows to the history below.
         </Callout>
       )}
 
@@ -475,7 +454,7 @@ function Editor({
               <button className={tab === 'GENERIC' ? 'active' : ''} onClick={() => setTab('GENERIC')}>
                 Generic
               </button>
-              {PLATFORM_LIST.map((p) => (
+              {PUBLISHABLE_PLATFORMS.map((p) => (
                 <button key={p} className={tab === p ? 'active' : ''} onClick={() => setTab(p)}>
                   {PLATFORMS[p].label}
                   {form.ovr[p].on && <span style={{ color: 'var(--gold)' }}> *</span>}
@@ -606,9 +585,10 @@ function Editor({
                     checked={targets.includes(a.id)}
                     onChange={() => toggleTarget(a.id)}
                   />
-                  <span className="who">
+                  <span className="who" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <b>{a.displayName ?? `account #${a.id}`}</b>
                     <Pill value={a.status} />
+                    {!a.canPublish && <Pill value="MANUAL" />}
                   </span>
                   <PlatformChip platform={a.platform} />
                 </label>
@@ -690,7 +670,12 @@ function Editor({
                     </div>
                     <div className="meta" style={{ marginTop: 2 }}>
                       {fmtDateTime(pub.publishedAt ?? pub.createdAt)}
-                      {pub.errorMessage && <span className="errtext"> · {pub.errorMessage}</span>}
+                      {pub.errorMessage && (
+                        <span className="errtext">
+                          {' · '}
+                          <Linkify text={pub.errorMessage} />
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -735,13 +720,7 @@ function Editor({
 
       {deleteOpen && (
         <ConfirmModal
-          title={
-            current?.status === 'PARTIALLY_PUBLISHED'
-              ? 'Delete partially published post'
-              : readOnly
-                ? 'Delete published post'
-                : 'Delete draft'
-          }
+          title={readOnly ? 'Delete published post' : 'Delete draft'}
           message={
             readOnly ? (
               <>The post will disappear from the app; its history stays.</>

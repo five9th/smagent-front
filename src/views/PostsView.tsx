@@ -7,12 +7,11 @@ import { ErrorBlock, Loading, Pill, SectionHead } from '../components/ui'
 import { useApiQuery } from '../hooks/useApiQuery'
 import { fmtDateTime, snippet } from '../lib/format'
 
-type Tab = 'ALL' | 'DRAFT' | 'PARTIALLY_PUBLISHED' | 'PUBLISHED'
+type Tab = 'ALL' | 'DRAFT' | 'PUBLISHED'
 
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: 'ALL', label: 'All' },
   { key: 'DRAFT', label: 'Drafts' },
-  { key: 'PARTIALLY_PUBLISHED', label: 'Partially published' },
   { key: 'PUBLISHED', label: 'Published' },
 ]
 
@@ -47,7 +46,6 @@ export default function PostsView() {
   const counts = {
     ALL: posts.length,
     DRAFT: posts.filter((p) => p.status === 'DRAFT').length,
-    PARTIALLY_PUBLISHED: posts.filter((p) => p.status === 'PARTIALLY_PUBLISHED').length,
     PUBLISHED: posts.filter((p) => p.status === 'PUBLISHED').length,
   }
 

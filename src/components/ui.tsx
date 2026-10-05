@@ -8,7 +8,6 @@ import { Icon } from './Icon'
 
 const PILL_CLASS: Record<string, string> = {
   DRAFT: 'p-draft',
-  PARTIALLY_PUBLISHED: 'p-partial',
   PUBLISHED: 'p-published',
   PENDING: 'p-submitted',
   SUCCESS: 'p-approved',
@@ -17,6 +16,7 @@ const PILL_CLASS: Record<string, string> = {
   UNVERIFIED: 'p-draft',
   INVALID: 'p-failed',
   PLANNED: 'p-scheduled',
+  MANUAL: 'p-manual',
 }
 
 export function Pill({ value, label }: { value: string; label?: string }) {
@@ -38,6 +38,26 @@ export function PlatformChip({ platform, lg }: { platform: Platform; lg?: boolea
       <span className={`g g-${platform.toLowerCase()}`}>{meta.label[0]}</span>
       {meta.label}
     </span>
+  )
+}
+
+/* --- Linkified text (manual-posting links inside error messages) ----------- */
+
+/** Renders plain text with any http(s) URLs as clickable links. */
+export function Linkify({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s)]+)/g)
+  return (
+    <>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noreferrer" style={{ overflowWrap: 'anywhere' }}>
+            {part}
+          </a>
+        ) : (
+          part
+        ),
+      )}
+    </>
   )
 }
 
