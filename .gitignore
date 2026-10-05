@@ -29,3 +29,4 @@ dist-ssr
 # Other
 example/
 TODO.txt
+/*.tar.gz
