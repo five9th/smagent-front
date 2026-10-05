@@ -17,7 +17,12 @@ const gitHash = (() => {
 // The SPA calls same-origin /api and Vite's dev server forwards it to the
 // Spring Boot backend. Override the target with SMAGENT_BACKEND_URL when it
 // doesn't run on localhost:8080.
+// Public deployment path (e.g. SMAGENT_BASE_PATH=/smagent/ for nginx under a
+// sub-path). Must have leading and trailing slashes. Dev default is '/'.
+const basePath = process.env.SMAGENT_BASE_PATH ?? '/'
+
 export default defineConfig({
+  base: basePath,
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(`${pkg.version}+${gitHash}`),

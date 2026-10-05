@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:demo": "SMAGENT_BASE_PATH=/smagent/ npm run build",
+    "build:demo": "tsc -b && SMAGENT_BASE_PATH=/smagent/ vite build",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview"
