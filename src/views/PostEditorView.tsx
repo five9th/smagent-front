@@ -230,9 +230,7 @@ function PublishModal({
                     <span>{a.displayName ?? `account #${a.id}`}</span>
                   </div>
                   <div className="meta" style={{ marginTop: 2 }}>
-                    {!a.canPublish
-                      ? 'manual — publishing gives you a link to create the post there by hand'
-                      : `will receive: ${usesOverride ? `${PLATFORMS[a.platform].label} override` : 'generic text'}`}
+                    {`will receive: ${usesOverride ? `${PLATFORMS[a.platform].label} override` : 'generic text'}`}
                     {a.status !== 'ACTIVE' && ` · account is ${a.status.toLowerCase()} (verify it first?)`}
                   </div>
                 </div>
@@ -246,6 +244,72 @@ function PublishModal({
         <Callout tone="danger">
           <b>Reddit posts require a non-empty title.</b> Add a title before publishing to Reddit.
         </Callout>
+      )}
+    </Modal>
+  )
+}
+
+/* --- Record-a-by-hand-post modal -------------------------------------------- */
+
+function ManualPublishModal({
+  account,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  account: AccountDto
+  busy: boolean
+  onClose: () => void
+  onConfirm: (externalUrl?: string) => void
+}) {
+  const [url, setUrl] = useState('')
+  const trimmed = url.trim()
+  const invalid = trimmed !== '' && !/^https?:\/\//.test(trimmed)
+
+  return (
+    <Modal
+      title="Mark as posted by hand"
+      sub={`${PLATFORMS[account.platform].label} · ${account.displayName ?? `account #${account.id}`}`}
+      onClose={busy ? undefined : onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            className="btn primary"
+            disabled={busy || invalid}
+            onClick={() => onConfirm(trimmed || undefined)}
+          >
+            {busy ? <Spinner /> : 'Record'}
+          </button>
+        </>
+      }
+    >
+      <p style={{ fontSize: 12.5, color: 'var(--text-dim)', margin: '0 0 12px' }}>
+        You opened the platform and created the post there yourself. Recording it keeps the history
+        complete — and it counts like a real publish: the post becomes <b>Published</b> and locks.
+      </p>
+      {account.credentialsMasked?.profileUrl && (
+        <p className="hint" style={{ margin: '0 0 12px' }}>
+          Didn’t post yet?{' '}
+          <a href={account.credentialsMasked.profileUrl} target="_blank" rel="noreferrer">
+            Open {account.displayName ?? PLATFORMS[account.platform].label} ↗
+          </a>{' '}
+          first.
+        </p>
+      )}
+      <label className="field">
+        <span className="lab">Link to the created post (optional)</span>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder={`https://${account.platform.toLowerCase()}.com/your-post…`}
+        />
+      </label>
+      {invalid && (
+        <InlineError error={new Error('The link must start with http:// or https://')} title="Check the link" />
       )}
     </Modal>
   )
@@ -308,8 +372,10 @@ function Editor({
   const [tab, setTab] = useState<Tab>('GENERIC')
   const [previewPlatform, setPreviewPlatform] = useState<Platform>('FACEBOOK')
   const [targets, setTargets] = useState<number[]>(() =>
-    accounts.filter((a) => a.status === 'ACTIVE').map((a) => a.id),
+    accounts.filter((a) => a.status === 'ACTIVE' && a.canPublish).map((a) => a.id),
   )
+  const apiAccounts = accounts.filter((a) => a.canPublish)
+  const manualAccounts = accounts.filter((a) => !a.canPublish)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<unknown>(null)
   const [publishOpen, setPublishOpen] = useState(false)
@@ -317,6 +383,8 @@ function Editor({
   const [results, setResults] = useState<PublishResult | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [manualFor, setManualFor] = useState<AccountDto | null>(null)
+  const [manualBusy, setManualBusy] = useState(false)
   /** "Delete publications" — the backend rejects true (501) until platform-side deletion ships. */
   const [deletePublications, setDeletePublications] = useState(false)
 
@@ -420,6 +488,26 @@ function Editor({
     } catch (e) {
       toast(describeError(e), 'error')
       setDeleting(false)
+    }
+  }
+
+  const doManualPublish = async (accountId: number, externalUrl?: string) => {
+    if (!postId) return
+    setManualBusy(true)
+    try {
+      const res = await postsApi.publishManual(postId, accountId, externalUrl)
+      toast(
+        res.results[0]?.publishedManually
+          ? `Recorded — posted by hand on ${res.results[0].accountName}`
+          : 'Recorded',
+      )
+      setManualFor(null)
+      if (post) refresh()
+      else postsApi.get(postId).then(setCreated).catch(() => {})
+    } catch (e) {
+      toast(describeError(e), 'error')
+    } finally {
+      setManualBusy(false)
     }
   }
 
@@ -573,12 +661,15 @@ function Editor({
             <div className="eyebrow" style={{ marginBottom: 10 }}>
               Target accounts
             </div>
-            {!accounts.length ? (
+            {!apiAccounts.length ? (
               <p className="hint" style={{ margin: 0 }}>
-                No accounts connected. <Link to="/accounts">Connect one →</Link>
+                {accounts.length
+                  ? 'Only manual accounts connected — publishing needs an account with API access.'
+                  : 'No accounts connected. '}
+                <Link to="/accounts">Connect one →</Link>
               </p>
             ) : (
-              accounts.map((a) => (
+              apiAccounts.map((a) => (
                 <label key={a.id} className={`pick ${targets.includes(a.id) ? 'on' : ''}`} style={{ marginBottom: 6 }}>
                   <input
                     type="checkbox"
@@ -588,13 +679,55 @@ function Editor({
                   <span className="who" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <b>{a.displayName ?? `account #${a.id}`}</b>
                     <Pill value={a.status} />
-                    {!a.canPublish && <Pill value="MANUAL" />}
                   </span>
                   <PlatformChip platform={a.platform} />
                 </label>
               ))
             )}
           </div>
+
+          {manualAccounts.length > 0 && (
+            <div className="card pad">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>
+                Manual accounts — open &amp; post by hand
+              </div>
+              {manualAccounts.map((a) => {
+                const url = a.credentialsMasked?.profileUrl
+                return (
+                  <div
+                    key={a.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}
+                  >
+                    <PlatformChip platform={a.platform} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <b style={{ fontSize: 12.5 }}>{a.displayName ?? `account #${a.id}`}</b>
+                      <div className="meta" style={{ marginTop: 1 }}>
+                        {url ? (
+                          <a href={url} target="_blank" rel="noreferrer" style={{ overflowWrap: 'anywhere' }}>
+                            open {url.replace(/^https?:\/\//, '')} ↗
+                          </a>
+                        ) : (
+                          'no link stored'
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      className="btn"
+                      disabled={!postId}
+                      title={postId ? 'Record that you posted there by hand' : 'Save the post first'}
+                      onClick={() => setManualFor(a)}
+                    >
+                      Mark as posted…
+                    </button>
+                  </div>
+                )
+              })}
+              <p className="hint" style={{ margin: 0 }}>
+                These have no API access: open the link, create the post there, then mark it as posted to
+                keep the history complete.
+              </p>
+            </div>
+          )}
 
           <div className="card pad">
             <div className="eyebrow" style={{ marginBottom: 10 }}>
@@ -690,6 +823,7 @@ function Editor({
                         <Icon name="external" />
                       </a>
                     )}
+                    {pub.publishedManually && <Pill value="MANUAL" label="by hand" />}
                     <Pill value={pub.status} />
                   </div>
                 </div>
@@ -699,6 +833,15 @@ function Editor({
             )}
           </div>
         </>
+      )}
+
+      {manualFor && (
+        <ManualPublishModal
+          account={manualFor}
+          busy={manualBusy}
+          onClose={() => setManualFor(null)}
+          onConfirm={(externalUrl) => void doManualPublish(manualFor.id, externalUrl)}
+        />
       )}
 
       {publishOpen && (

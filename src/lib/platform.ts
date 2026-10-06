@@ -5,6 +5,8 @@ export interface CredentialField {
   label: string
   placeholder: string
   secret?: boolean
+  /** Identifier, not a secret — shown in full in credentialsMasked (nonSecretCredentialFields). */
+  nonSecret?: boolean
   hint?: string
 }
 
@@ -34,6 +36,7 @@ export const AUTH_METHOD_LABELS: Record<AuthMethod, string> = {
 const PROFILE_URL_FIELD: CredentialField = {
   key: 'profileUrl',
   label: 'Link to your page or profile',
+  nonSecret: true,
   placeholder: 'https://facebook.com/your-page',
   hint: 'Manual option: SMAgent can’t post to it automatically — publishing will give you this link to create the post there by hand.',
 }
@@ -54,7 +57,7 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
         authMethod: 'PAGE_ACCESS_TOKEN',
         canPublish: true,
         fields: [
-          { key: 'pageId', label: 'Page ID', placeholder: '123456789012345' },
+          { key: 'pageId', label: 'Page ID', placeholder: '123456789012345', nonSecret: true },
           {
             key: 'pageAccessToken',
             label: 'Page access token',
@@ -76,11 +79,11 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
         authMethod: 'PASSWORD_GRANT',
         canPublish: true,
         fields: [
-          { key: 'clientId', label: 'Client ID', placeholder: 'client-id' },
+          { key: 'clientId', label: 'Client ID', placeholder: 'client-id', nonSecret: true },
           { key: 'clientSecret', label: 'Client secret', placeholder: 'client-secret', secret: true },
-          { key: 'username', label: 'Username', placeholder: 'reddit-user' },
+          { key: 'username', label: 'Username', placeholder: 'reddit-user', nonSecret: true },
           { key: 'password', label: 'Password', placeholder: '••••••••', secret: true },
-          { key: 'subreddit', label: 'Subreddit', placeholder: 'test (without r/)' },
+          { key: 'subreddit', label: 'Subreddit', placeholder: 'test (without r/)', nonSecret: true },
         ],
       },
       PROFILE_URL_OPTION,

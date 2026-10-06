@@ -27,6 +27,14 @@ export const postsApi = {
   publish: (id: number, accountIds: number[]) =>
     api<PublishResult>('POST', `/posts/${id}/publish`, { accountIds }),
 
+  /** Record a post made by hand (opened the platform and posted there yourself). */
+  publishManual: (id: number, accountId: number, externalUrl?: string) =>
+    api<PublishResult>(
+      'POST',
+      `/posts/${id}/publish-manual`,
+      { accountId, ...(externalUrl ? { externalUrl } : {}) },
+    ),
+
   /** Flat attempt log for one post, newest first. Requires postId. */
   publications: (postId: number) =>
     api<PublicationDto[]>('GET', `/publications?postId=${postId}`),

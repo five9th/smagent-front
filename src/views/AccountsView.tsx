@@ -7,6 +7,7 @@ import {
   ConfirmModal,
   ErrorBlock,
   InlineError,
+  Linkify,
   Loading,
   Modal,
   Pill,
@@ -293,7 +294,9 @@ export default function AccountsView() {
               {Object.entries(a.credentialsMasked ?? {}).map(([k, v]) => (
                 <div key={k} style={{ display: 'contents' }}>
                   <span className="k mono" style={{ fontSize: 11 }}>{k}</span>
-                  <span className="v mono" style={{ fontSize: 11 }}>{v}</span>
+                  <span className="v mono" style={{ fontSize: 11 }}>
+                    {/^https?:\/\//.test(v) ? <Linkify text={v} /> : v}
+                  </span>
                 </div>
               ))}
               {!Object.keys(a.credentialsMasked ?? {}).length && (

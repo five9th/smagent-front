@@ -40,6 +40,8 @@ export interface PublicationDto {
   platform: Platform
   accountName: string
   status: PublicationStatus
+  /** True for rows recorded via publish-manual (posted by hand), not an adapter attempt. */
+  publishedManually: boolean
   externalUrl: string | null
   errorMessage: string | null
   publishedAt: string | null
@@ -67,6 +69,7 @@ export interface PublishTargetResult {
   platform: Platform
   accountName: string
   status: PublicationStatus
+  publishedManually: boolean
   externalUrl: string | null
   errorMessage: string | null
 }
