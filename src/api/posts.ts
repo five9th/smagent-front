@@ -35,6 +35,10 @@ export const postsApi = {
       { accountId, ...(externalUrl ? { externalUrl } : {}) },
     ),
 
+  /** Prefilled platform composer URL for a manual account (per-platform overrides apply). */
+  shareUrl: (id: number, accountId: number) =>
+    api<{ url: string }>('GET', `/posts/${id}/share-url?accountId=${accountId}`),
+
   /** Flat attempt log for one post, newest first. Requires postId. */
   publications: (postId: number) =>
     api<PublicationDto[]>('GET', `/publications?postId=${postId}`),

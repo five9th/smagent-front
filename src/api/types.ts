@@ -13,10 +13,11 @@ export interface UserDto {
   role: string
 }
 
-/** The post's own title+text unit; media fields may land here later. */
+/** The post's own content unit; the optional link feeds manual share composers. */
 export interface PostContent {
   title: string | null
   text: string
+  link: string | null
 }
 
 export interface AccountDto {
@@ -25,6 +26,8 @@ export interface AccountDto {
   authMethod: AuthMethod
   /** False for manual login options (PROFILE_URL) — no platform API access. */
   canPublish: boolean
+  /** True when the login option can compose a prefilled share/composer URL. */
+  canShare: boolean
   displayName: string | null
   status: AccountStatus
   credentialsMasked: Record<string, string>

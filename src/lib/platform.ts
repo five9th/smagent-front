@@ -15,6 +15,8 @@ export interface LoginOption {
   authMethod: AuthMethod
   /** False for manual options (PROFILE_URL) — no platform API access. */
   canPublish: boolean
+  /** True when a prefilled share/composer URL can be composed for this option. */
+  canShare: boolean
   fields: CredentialField[]
 }
 
@@ -38,13 +40,11 @@ const PROFILE_URL_FIELD: CredentialField = {
   label: 'Link to your page or profile',
   nonSecret: true,
   placeholder: 'https://facebook.com/your-page',
-  hint: 'Manual option: SMAgent can’t post to it automatically — publishing will give you this link to create the post there by hand.',
+  hint: 'Manual option: SMAgent can’t post here automatically — “Open to post by hand” opens the platform’s composer with the post prefilled.',
 }
 
-const PROFILE_URL_OPTION: LoginOption = {
-  authMethod: 'PROFILE_URL',
-  canPublish: false,
-  fields: [PROFILE_URL_FIELD],
+function profileUrlOption(fields: CredentialField[] = [PROFILE_URL_FIELD]): LoginOption {
+  return { authMethod: 'PROFILE_URL', canPublish: false, canShare: true, fields }
 }
 
 export const PLATFORMS: Record<Platform, PlatformMeta> = {
@@ -56,6 +56,7 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
       {
         authMethod: 'PAGE_ACCESS_TOKEN',
         canPublish: true,
+        canShare: false,
         fields: [
           { key: 'pageId', label: 'Page ID', placeholder: '123456789012345', nonSecret: true },
           {
@@ -67,7 +68,7 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
           },
         ],
       },
-      PROFILE_URL_OPTION,
+      profileUrlOption(),
     ],
   },
   REDDIT: {
@@ -78,6 +79,7 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
       {
         authMethod: 'PASSWORD_GRANT',
         canPublish: true,
+        canShare: false,
         fields: [
           { key: 'clientId', label: 'Client ID', placeholder: 'client-id', nonSecret: true },
           { key: 'clientSecret', label: 'Client secret', placeholder: 'client-secret', secret: true },
@@ -86,20 +88,23 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
           { key: 'subreddit', label: 'Subreddit', placeholder: 'test (without r/)', nonSecret: true },
         ],
       },
-      PROFILE_URL_OPTION,
+      profileUrlOption([
+        PROFILE_URL_FIELD,
+        { key: 'subreddit', label: 'Subreddit', placeholder: 'test (without r/)', nonSecret: true },
+      ]),
     ],
   },
   X: {
     label: 'X',
     maxLength: 280,
     requiresTitle: false,
-    loginOptions: [PROFILE_URL_OPTION],
+    loginOptions: [profileUrlOption()],
   },
   LINKEDIN: {
     label: 'LinkedIn',
     maxLength: 3000,
     requiresTitle: false,
-    loginOptions: [PROFILE_URL_OPTION],
+    loginOptions: [profileUrlOption()],
   },
 }
 

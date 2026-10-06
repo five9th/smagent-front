@@ -28,29 +28,32 @@ interface OverrideForm {
   on: boolean
   title: string
   text: string
+  link: string
 }
 
 interface FormState {
   title: string
   text: string
+  /** Optional http(s) link the post shares — feeds the manual share composers. */
+  link: string
   ovr: Record<Platform, OverrideForm>
 }
 
 function emptyOvr(): Record<Platform, OverrideForm> {
   return Object.fromEntries(
-    PUBLISHABLE_PLATFORMS.map((p) => [p, { on: false, title: '', text: '' }]),
+    PUBLISHABLE_PLATFORMS.map((p) => [p, { on: false, title: '', text: '', link: '' }]),
   ) as Record<Platform, OverrideForm>
 }
 
-const EMPTY_FORM: FormState = { title: '', text: '', ovr: emptyOvr() }
+const EMPTY_FORM: FormState = { title: '', text: '', link: '', ovr: emptyOvr() }
 
 function formFromPost(post: PostDto): FormState {
   const ovr = emptyOvr()
   for (const p of PUBLISHABLE_PLATFORMS) {
     const o = post.overrides?.[p]
-    if (o) ovr[p] = { on: true, title: o.title ?? '', text: o.text }
+    if (o) ovr[p] = { on: true, title: o.title ?? '', text: o.text, link: o.link ?? '' }
   }
-  return { title: post.content.title ?? '', text: post.content.text, ovr }
+  return { title: post.content.title ?? '', text: post.content.text, link: post.content.link ?? '', ovr }
 }
 
 /** Per-field fallback exactly as the backend resolves at publish time. */
@@ -63,6 +66,13 @@ function effectiveText(form: FormState, platform: Platform): string {
   const o = form.ovr[platform]
   return o.on && o.text.trim() ? o.text : form.text
 }
+
+function effectiveLink(form: FormState, platform: Platform): string {
+  const o = form.ovr[platform]
+  return o.on && o.link.trim() ? o.link : form.link
+}
+
+const looksLikeUrl = (v: string) => /^https?:\/\//.test(v)
 
 /* --- Live preview --------------------------------------------------------- */
 
@@ -82,6 +92,7 @@ function PreviewCard({
   const override = form.ovr[platform].on
   const title = effectiveTitle(form, platform)
   const text = effectiveText(form, platform)
+  const link = effectiveLink(form, platform)
   const len = text.length
   const over = len > meta.maxLength
 
@@ -115,6 +126,14 @@ function PreviewCard({
       <div className="pbody">
         {text || <span style={{ color: 'var(--text-mute)' }}>Nothing yet — start typing the generic text.</span>}
       </div>
+      {link && (
+        <div className="meta mono" style={{ marginTop: 8, overflowWrap: 'anywhere' }}>
+          🔗{' '}
+          <a href={link} target="_blank" rel="noreferrer">
+            {link}
+          </a>
+        </div>
+      )}
       <div className="pcount">
         {len.toLocaleString('en-US')} / ~{meta.maxLength.toLocaleString('en-US')} chars
         {over && ` — ${len - meta.maxLength} over (soft limit, not enforced)`}
@@ -385,6 +404,7 @@ function Editor({
   const [deleting, setDeleting] = useState(false)
   const [manualFor, setManualFor] = useState<AccountDto | null>(null)
   const [manualBusy, setManualBusy] = useState(false)
+  const [shareBusy, setShareBusy] = useState<number | null>(null)
   /** "Delete publications" — the backend rejects true (501) until platform-side deletion ships. */
   const [deletePublications, setDeletePublications] = useState(false)
 
@@ -410,13 +430,26 @@ function Editor({
         return null
       }
     }
+    const links = [form.link, ...PUBLISHABLE_PLATFORMS.filter((p) => form.ovr[p].on).map((p) => form.ovr[p].link)]
+    const badLink = links.find((l) => l.trim() !== '' && !looksLikeUrl(l.trim()))
+    if (badLink !== undefined) {
+      setFormError('Links must start with http:// or https://.')
+      return null
+    }
     const overrides: Partial<Record<Platform, PostContent>> = {}
     for (const p of PUBLISHABLE_PLATFORMS) {
       if (form.ovr[p].on) {
-        overrides[p] = { title: form.ovr[p].title.trim() || null, text: form.ovr[p].text }
+        overrides[p] = {
+          title: form.ovr[p].title.trim() || null,
+          text: form.ovr[p].text,
+          link: form.ovr[p].link.trim() || null,
+        }
       }
     }
-    return { content: { title: form.title.trim() || null, text: form.text }, overrides }
+    return {
+      content: { title: form.title.trim() || null, text: form.text, link: form.link.trim() || null },
+      overrides,
+    }
   }
 
   /** Create or update; returns the saved post or null on failure. */
@@ -511,6 +544,20 @@ function Editor({
     }
   }
 
+  /** Open the platform's composer prefilled with this post (manual accounts). */
+  const openShare = async (account: AccountDto) => {
+    if (!postId) return
+    setShareBusy(account.id)
+    try {
+      const { url } = await postsApi.shareUrl(postId, account.id)
+      window.open(url, '_blank', 'noopener')
+    } catch (e) {
+      toast(describeError(e), 'error')
+    } finally {
+      setShareBusy(null)
+    }
+  }
+
   const toggleTarget = (accountId: number) => {
     setTargets((ts) => (ts.includes(accountId) ? ts.filter((t) => t !== accountId) : [...ts, accountId]))
   }
@@ -574,6 +621,18 @@ function Editor({
                     placeholder="Write once, publish everywhere…"
                   />
                 </label>
+                <label className="field">
+                  <span className="lab">
+                    Link (optional) — attached to the post, e.g. an image or article
+                  </span>
+                  <input
+                    type="url"
+                    value={form.link}
+                    disabled={readOnly}
+                    onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
+                    placeholder="https://example.com/my-picture"
+                  />
+                </label>
                 <div className="media-drop">
                   🖼 &nbsp;Image and video support is coming later — posts are text-only for now.
                 </div>
@@ -630,6 +689,20 @@ function Editor({
                         ? `${PLATFORMS[tab].label}-specific variant of this post…`
                         : 'Enable the override to write a platform-specific variant.'
                     }
+                  />
+                </label>
+                <label className="field">
+                  <span className="lab">
+                    {PLATFORMS[tab].label} link — optional, falls back to the generic link when empty
+                  </span>
+                  <input
+                    type="url"
+                    value={form.ovr[tab].link}
+                    disabled={readOnly || !form.ovr[tab].on}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], link: e.target.value } } }))
+                    }
+                    placeholder={form.ovr[tab].on ? form.link || 'no generic link either' : '—'}
                   />
                 </label>
                 <p className="hint">
@@ -692,24 +765,40 @@ function Editor({
                 Manual accounts — open &amp; post by hand
               </div>
               {manualAccounts.map((a) => {
-                const url = a.credentialsMasked?.profileUrl
+                const profileUrl = a.credentialsMasked?.profileUrl
+                const name = a.displayName ?? `account #${a.id}`
                 return (
                   <div key={a.id} style={{ marginBottom: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <PlatformChip platform={a.platform} />
-                      <b
-                        style={{
-                          fontSize: 12.5,
-                          flex: 1,
-                          minWidth: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        title={a.displayName ?? `account #${a.id}`}
-                      >
-                        {a.displayName ?? `account #${a.id}`}
-                      </b>
+                      {profileUrl ? (
+                        <a
+                          href={profileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={`${name} — open the ${PLATFORMS[a.platform].label} ${a.platform === 'REDDIT' ? 'subreddit' : 'page/profile'}`}
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            flex: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            textDecoration: 'underline dotted',
+                            textUnderlineOffset: 3,
+                          }}
+                        >
+                          {name}
+                        </a>
+                      ) : (
+                        <b
+                          style={{ fontSize: 12.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          title={name}
+                        >
+                          {name}
+                        </b>
+                      )}
                       <button
                         className="btn"
                         disabled={!postId}
@@ -719,22 +808,30 @@ function Editor({
                         Mark as posted…
                       </button>
                     </div>
-                    {url ? (
-                      <a
-                        className="btn ghost"
-                        style={{ marginTop: 6, padding: '4px 10px', fontSize: 11, textDecoration: 'none' }}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        title={url}
-                      >
-                        Open to post by hand ↗
-                      </a>
-                    ) : (
-                      <p className="hint" style={{ margin: '4px 0 0' }}>
-                        No link stored for this account.
-                      </p>
-                    )}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      {a.canShare ? (
+                        <button
+                          className="btn ghost"
+                          style={{ padding: '4px 10px', fontSize: 11 }}
+                          disabled={!postId || shareBusy === a.id}
+                          title={postId ? 'Opens the platform composer with this post prefilled' : 'Save the post first'}
+                          onClick={() => void openShare(a)}
+                        >
+                          {shareBusy === a.id ? <Spinner /> : 'Open to post by hand ↗'}
+                        </button>
+                      ) : profileUrl ? (
+                        <a
+                          className="btn ghost"
+                          style={{ padding: '4px 10px', fontSize: 11, textDecoration: 'none' }}
+                          href={profileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={profileUrl}
+                        >
+                          Open profile ↗
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
                 )
               })}
