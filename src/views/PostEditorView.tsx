@@ -694,31 +694,47 @@ function Editor({
               {manualAccounts.map((a) => {
                 const url = a.credentialsMasked?.profileUrl
                 return (
-                  <div
-                    key={a.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}
-                  >
-                    <PlatformChip platform={a.platform} />
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <b style={{ fontSize: 12.5 }}>{a.displayName ?? `account #${a.id}`}</b>
-                      <div className="meta" style={{ marginTop: 1 }}>
-                        {url ? (
-                          <a href={url} target="_blank" rel="noreferrer" style={{ overflowWrap: 'anywhere' }}>
-                            open {url.replace(/^https?:\/\//, '')} ↗
-                          </a>
-                        ) : (
-                          'no link stored'
-                        )}
-                      </div>
+                  <div key={a.id} style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <PlatformChip platform={a.platform} />
+                      <b
+                        style={{
+                          fontSize: 12.5,
+                          flex: 1,
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={a.displayName ?? `account #${a.id}`}
+                      >
+                        {a.displayName ?? `account #${a.id}`}
+                      </b>
+                      <button
+                        className="btn"
+                        disabled={!postId}
+                        title={postId ? 'Record that you posted there by hand' : 'Save the post first'}
+                        onClick={() => setManualFor(a)}
+                      >
+                        Mark as posted…
+                      </button>
                     </div>
-                    <button
-                      className="btn"
-                      disabled={!postId}
-                      title={postId ? 'Record that you posted there by hand' : 'Save the post first'}
-                      onClick={() => setManualFor(a)}
-                    >
-                      Mark as posted…
-                    </button>
+                    {url ? (
+                      <a
+                        className="btn ghost"
+                        style={{ marginTop: 6, padding: '4px 10px', fontSize: 11, textDecoration: 'none' }}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={url}
+                      >
+                        Open to post by hand ↗
+                      </a>
+                    ) : (
+                      <p className="hint" style={{ margin: '4px 0 0' }}>
+                        No link stored for this account.
+                      </p>
+                    )}
                   </div>
                 )
               })}
