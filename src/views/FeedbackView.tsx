@@ -100,7 +100,7 @@ export default function FeedbackView() {
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void add(e)
           }}
-          placeholder="Add a note for the demo…"
+          placeholder="Here you can add a note for developer to fix/change/add a feature…"
           style={{ flex: 1, minHeight: 0 }}
         />
         <button className="btn primary" disabled={adding || !text.trim()}>
