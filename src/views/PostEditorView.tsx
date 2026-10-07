@@ -452,21 +452,26 @@ function Editor({
     }
   }
 
-  /** Create or update; returns the saved post or null on failure. */
-  const save = async (navigateAfterCreate: boolean): Promise<PostDto | null> => {
+  /**
+   * Create or update; returns the saved post or null on failure. `silent`
+   * suppresses the success toast (publish/share/autosave announce themselves),
+   * errors always surface; `navigateAfterCreate` is the explicit Save button
+   * catching the URL up on /posts/new.
+   */
+  const save = async (opts: { silent?: boolean; navigateAfterCreate?: boolean } = {}): Promise<PostDto | null> => {
     const input = buildInput()
     if (!input) return null
     setSaving(true)
     try {
       const saved = postId ? await postsApi.update(postId, input) : await postsApi.create(input)
       setBaseline(JSON.stringify(formFromPost(saved)))
-      toast(postId ? 'Draft saved' : 'Draft created')
+      if (!opts.silent) toast(postId ? 'Draft saved' : 'Draft created')
       if (postId) {
         refresh()
         return saved
       }
       setCreated(saved)
-      if (navigateAfterCreate) nav(`/posts/${saved.id}`, { replace: true })
+      if (opts.navigateAfterCreate) nav(`/posts/${saved.id}`, { replace: true })
       return saved
     } catch (e) {
       setFormError(e)
@@ -477,15 +482,39 @@ function Editor({
     }
   }
 
+
+  // Auto-save a non-empty draft when the user switches away — nothing is lost
+  // to a forgotten Save, and the beforeunload warning above only remains for
+  // saves that failed (e.g. offline). No dep array: re-subscribes every render
+  // so the handler always sees the latest form.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (
+        document.visibilityState === 'hidden' &&
+        dirty &&
+        !readOnly &&
+        !saving &&
+        form.text.trim()
+      ) {
+        void save({ silent: true })
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  })
+
   const doPublish = async () => {
     setPublishing(true)
     try {
       let pid = postId
-      if (!pid) {
-        const saved = await save(false)
+      if (!readOnly) {
+        // Publish what's on screen: save pending edits first, so an unsaved
+        // draft never publishes its stale server version.
+        const saved = await save({ silent: true })
         if (!saved) return
         pid = saved.id
       }
+      if (pid == null) return // unreachable: published posts always have an id
       const res = await postsApi.publish(pid, targets)
       setResults(res)
       const total = res.results.length
@@ -546,10 +575,18 @@ function Editor({
 
   /** Open the platform's composer prefilled with this post (manual accounts). */
   const openShare = async (account: AccountDto) => {
-    if (!postId) return
     setShareBusy(account.id)
     try {
-      const { url } = await postsApi.shareUrl(postId, account.id)
+      // The composer is prefilled from the saved post — persist edits first so
+      // it always shows what's on screen.
+      let pid = postId
+      if (!readOnly) {
+        const saved = await save({ silent: true })
+        if (!saved) return
+        pid = saved.id
+      }
+      if (pid == null) return // unreachable: published posts always have an id
+      const { url } = await postsApi.shareUrl(pid, account.id)
       window.open(url, '_blank', 'noopener')
     } catch (e) {
       toast(describeError(e), 'error')
@@ -813,8 +850,8 @@ function Editor({
                         <button
                           className="btn ghost"
                           style={{ padding: '4px 10px', fontSize: 11 }}
-                          disabled={!postId || shareBusy === a.id}
-                          title={postId ? 'Opens the platform composer with this post prefilled' : 'Save the post first'}
+                          disabled={shareBusy === a.id || saving}
+                          title="Saves the post if needed, then opens the platform composer with it prefilled"
                           onClick={() => void openShare(a)}
                         >
                           {shareBusy === a.id ? <Spinner /> : 'Open to post by hand ↗'}
@@ -862,7 +899,11 @@ function Editor({
             </div>
             <div className="btn-row">
               {!readOnly && (
-                <button className="btn primary" onClick={() => void save(true)} disabled={saving}>
+                <button
+                  className="btn primary"
+                  onClick={() => void save({ navigateAfterCreate: true })}
+                  disabled={saving}
+                >
                   {saving ? <Spinner /> : postId ? 'Save changes' : 'Save draft'}
                 </button>
               )}
