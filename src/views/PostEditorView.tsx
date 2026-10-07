@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { accountsApi } from '../api/accounts'
 import { postsApi } from '../api/posts'
@@ -502,6 +502,17 @@ function Editor({
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
   })
+
+  // Best-effort autosave when the editor unmounts — in-app navigation
+  // (Dashboard, Accounts, another post…) must not lose dirty edits either.
+  // Latest-ref indirection because an empty-deps cleanup closes over stale state.
+  const autosaveOnLeave = useRef<() => void>(() => {})
+  useEffect(() => {
+    autosaveOnLeave.current = () => {
+      if (dirty && !readOnly && !saving && form.text.trim()) void save({ silent: true })
+    }
+  })
+  useEffect(() => () => autosaveOnLeave.current(), [])
 
   const doPublish = async () => {
     setPublishing(true)
