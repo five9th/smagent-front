@@ -588,19 +588,13 @@ function Editor({
   /** Open the platform's composer prefilled with this post (manual accounts). */
   const openShare = async (account: AccountDto) => {
     setShareBusy(account.id)
-    // Open the tab synchronously inside the click gesture — browsers block
-    // window.open that happens after awaits; navigate it once the URL is ready.
-    const win = window.open('about:blank', '_blank', 'noopener')
     try {
       // The composer is prefilled from the saved post — persist edits first so
       // it always shows what's on screen.
       let pid = postId
       if (!readOnly) {
         const saved = await save({ silent: true })
-        if (!saved) {
-          win?.close()
-          return
-        }
+        if (!saved) return
         pid = saved.id
       }
       if (pid == null) return // unreachable: published posts always have an id
@@ -616,10 +610,8 @@ function Editor({
       } else {
         toast('Composer opened')
       }
-      if (win) win.location.href = url
-      else window.open(url, '_blank', 'noopener')
+      window.open(url, '_blank', 'noopener')
     } catch (e) {
-      win?.close()
       toast(describeError(e), 'error')
     } finally {
       setShareBusy(null)
