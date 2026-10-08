@@ -7,6 +7,7 @@ import { Icon } from '../components/Icon'
 import {
   Callout,
   ConfirmModal,
+  CopyButton,
   ErrorBlock,
   InlineError,
   Linkify,
@@ -587,19 +588,38 @@ function Editor({
   /** Open the platform's composer prefilled with this post (manual accounts). */
   const openShare = async (account: AccountDto) => {
     setShareBusy(account.id)
+    // Open the tab synchronously inside the click gesture — browsers block
+    // window.open that happens after awaits; navigate it once the URL is ready.
+    const win = window.open('about:blank', '_blank', 'noopener')
     try {
       // The composer is prefilled from the saved post — persist edits first so
       // it always shows what's on screen.
       let pid = postId
       if (!readOnly) {
         const saved = await save({ silent: true })
-        if (!saved) return
+        if (!saved) {
+          win?.close()
+          return
+        }
         pid = saved.id
       }
       if (pid == null) return // unreachable: published posts always have an id
       const { url } = await postsApi.shareUrl(pid, account.id)
-      window.open(url, '_blank', 'noopener')
+      // Facebook/LinkedIn composers don't take prefilled text — hand it over
+      // via the clipboard so it's one paste away.
+      const text = effectiveText(form, account.platform)
+      if (text.trim()) {
+        await navigator.clipboard.writeText(text).then(
+          () => toast('Composer opened — post text copied, paste it there'),
+          () => toast('Composer opened — copy the text manually from the editor'),
+        )
+      } else {
+        toast('Composer opened')
+      }
+      if (win) win.location.href = url
+      else window.open(url, '_blank', 'noopener')
     } catch (e) {
+      win?.close()
       toast(describeError(e), 'error')
     } finally {
       setShareBusy(null)
@@ -648,8 +668,11 @@ function Editor({
             {tab === 'GENERIC' ? (
               <>
                 <label className="field">
-                  <span className="lab">
-                    Title <span style={{ color: 'var(--text-mute)' }}>(optional — required for Reddit)</span>
+                  <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ flex: 1 }}>
+                      Title <span style={{ color: 'var(--text-mute)' }}>(optional — required for Reddit)</span>
+                    </span>
+                    <CopyButton value={form.title} />
                   </span>
                   <input
                     type="text"
@@ -660,7 +683,10 @@ function Editor({
                   />
                 </label>
                 <label className="field">
-                  <span className="lab">Text — shared by all platforms unless overridden</span>
+                  <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ flex: 1 }}>Text — shared by all platforms unless overridden</span>
+                    <CopyButton value={form.text} />
+                  </span>
                   <textarea
                     rows={8}
                     value={form.text}
@@ -670,8 +696,9 @@ function Editor({
                   />
                 </label>
                 <label className="field">
-                  <span className="lab">
-                    Link (optional) — attached to the post, e.g. an image or article
+                  <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ flex: 1 }}>Link (optional) — attached to the post, e.g. an image or article</span>
+                    <CopyButton value={form.link} />
                   </span>
                   <input
                     type="url"
@@ -710,8 +737,11 @@ function Editor({
                   </span>
                 </label>
                 <label className="field">
-                  <span className="lab">
-                    {PLATFORMS[tab].label} title — optional, falls back to the generic title when empty
+                  <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ flex: 1 }}>
+                      {PLATFORMS[tab].label} title — optional, falls back to the generic title when empty
+                    </span>
+                    <CopyButton value={form.ovr[tab].title} />
                   </span>
                   <input
                     type="text"
@@ -724,7 +754,12 @@ function Editor({
                   />
                 </label>
                 <label className="field">
-                  <span className="lab">{PLATFORMS[tab].label} text — required when the override is enabled</span>
+                  <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ flex: 1 }}>
+                      {PLATFORMS[tab].label} text — required when the override is enabled
+                    </span>
+                    <CopyButton value={form.ovr[tab].text} />
+                  </span>
                   <textarea
                     rows={8}
                     value={form.ovr[tab].text}
@@ -740,8 +775,11 @@ function Editor({
                   />
                 </label>
                 <label className="field">
-                  <span className="lab">
-                    {PLATFORMS[tab].label} link — optional, falls back to the generic link when empty
+                  <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ flex: 1 }}>
+                      {PLATFORMS[tab].label} link — optional, falls back to the generic link when empty
+                    </span>
+                    <CopyButton value={form.ovr[tab].link} />
                   </span>
                   <input
                     type="url"

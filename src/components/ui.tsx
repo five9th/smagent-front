@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { Platform } from '../api/types'
 import { describeError } from '../lib/errors'
 import { PLATFORMS } from '../lib/platform'
@@ -58,6 +58,35 @@ export function Linkify({ text }: { text: string }) {
         ),
       )}
     </>
+  )
+}
+
+/** Compact copy-to-clipboard affordance for field labels. Inert when empty. */
+export function CopyButton({ value, title = 'Copy to clipboard' }: { value: string; title?: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      type="button"
+      className="iconlink"
+      style={{ opacity: value ? undefined : 0.3, cursor: value ? 'pointer' : 'default' }}
+      disabled={!value}
+      title={title}
+      aria-label={title}
+      onClick={(e) => {
+        // keep the surrounding <label> from hijacking the click
+        e.preventDefault()
+        e.stopPropagation()
+        navigator.clipboard.writeText(value).then(
+          () => {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1200)
+          },
+          () => {},
+        )
+      }}
+    >
+      <Icon name={copied ? 'check' : 'copy'} />
+    </button>
   )
 }
 
