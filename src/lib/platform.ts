@@ -110,14 +110,6 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
 
 export const PLATFORM_LIST = Object.keys(PLATFORMS) as Platform[]
 
-// TODO: no, override tabs and previews make sense for manual accounts as well
-//  since the app can generate override-aware shareUrl now
-/** Platforms with an API login option — override tabs and previews only make sense for these. */
-// export const PUBLISHABLE_PLATFORMS = PLATFORM_LIST.filter((p) =>
-//   PLATFORMS[p].loginOptions.some((o) => o.canPublish),
-// )
-export const PUBLISHABLE_PLATFORMS = PLATFORM_LIST // temp, needs a proper fix
-
 export function loginOptionFor(platform: Platform, authMethod: AuthMethod): LoginOption | undefined {
   return PLATFORMS[platform].loginOptions.find((o) => o.authMethod === authMethod)
 }

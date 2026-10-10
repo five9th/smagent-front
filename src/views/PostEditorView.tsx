@@ -21,7 +21,7 @@ import { useApiQuery } from '../hooks/useApiQuery'
 import { useToast } from '../hooks/useToast'
 import { describeError } from '../lib/errors'
 import { fmtDateTime } from '../lib/format'
-import { PLATFORMS, PUBLISHABLE_PLATFORMS } from '../lib/platform'
+import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
 
 type Tab = 'GENERIC' | Platform
 
@@ -42,7 +42,7 @@ interface FormState {
 
 function emptyOvr(): Record<Platform, OverrideForm> {
   return Object.fromEntries(
-    PUBLISHABLE_PLATFORMS.map((p) => [p, { on: false, title: '', text: '', link: '' }]),
+    PLATFORM_LIST.map((p) => [p, { on: false, title: '', text: '', link: '' }]),
   ) as Record<Platform, OverrideForm>
 }
 
@@ -50,7 +50,7 @@ const EMPTY_FORM: FormState = { title: '', text: '', link: '', ovr: emptyOvr() }
 
 function formFromPost(post: PostDto): FormState {
   const ovr = emptyOvr()
-  for (const p of PUBLISHABLE_PLATFORMS) {
+  for (const p of PLATFORM_LIST) {
     const o = post.overrides?.[p]
     if (o) ovr[p] = { on: true, title: o.title ?? '', text: o.text, link: o.link ?? '' }
   }
@@ -106,7 +106,7 @@ function PreviewCard({
           <div className="pt">{meta.label} · preview</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          {PUBLISHABLE_PLATFORMS.map((p) => (
+          {PLATFORM_LIST.map((p) => (
             <button
               key={p}
               className="btn ghost"
@@ -425,20 +425,20 @@ function Editor({
       setFormError('Post text is required.')
       return null
     }
-    for (const p of PUBLISHABLE_PLATFORMS) {
+    for (const p of PLATFORM_LIST) {
       if (form.ovr[p].on && !form.ovr[p].text.trim()) {
         setFormError(`The ${PLATFORMS[p].label} override needs its own text (or disable it).`)
         return null
       }
     }
-    const links = [form.link, ...PUBLISHABLE_PLATFORMS.filter((p) => form.ovr[p].on).map((p) => form.ovr[p].link)]
+    const links = [form.link, ...PLATFORM_LIST.filter((p) => form.ovr[p].on).map((p) => form.ovr[p].link)]
     const badLink = links.find((l) => l.trim() !== '' && !looksLikeUrl(l.trim()))
     if (badLink !== undefined) {
       setFormError('Links must start with http:// or https://.')
       return null
     }
     const overrides: Partial<Record<Platform, PostContent>> = {}
-    for (const p of PUBLISHABLE_PLATFORMS) {
+    for (const p of PLATFORM_LIST) {
       if (form.ovr[p].on) {
         overrides[p] = {
           title: form.ovr[p].title.trim() || null,
@@ -649,7 +649,7 @@ function Editor({
               <button className={tab === 'GENERIC' ? 'active' : ''} onClick={() => setTab('GENERIC')}>
                 Generic
               </button>
-              {PUBLISHABLE_PLATFORMS.map((p) => (
+              {PLATFORM_LIST.map((p) => (
                 <button key={p} className={tab === p ? 'active' : ''} onClick={() => setTab(p)}>
                   {PLATFORMS[p].label}
                   {form.ovr[p].on && <span style={{ color: 'var(--gold)' }}> *</span>}
