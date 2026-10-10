@@ -289,8 +289,11 @@ input[type=checkbox] { accent-color: var(--gold); width: 15px; height: 15px; fle
 .boot { height: 100vh; display: grid; place-items: center; color: var(--text-mute); gap: 10px; }
 
 .dim { opacity: .55; pointer-events: none; user-select: none; }
-.iconlink { color: var(--text-mute); display: inline-flex; padding: 3px; border-radius: 6px; }
-.iconlink:hover { color: var(--gold); }
+.iconlink {
+  color: var(--text-mute); display: inline-flex; padding: 3px; border-radius: 6px;
+  background: transparent; border: 0; /* button usages need the UA chrome reset */
+}
+.iconlink:hover:not(:disabled) { color: var(--gold); background: var(--card-hover); }
 .iconlink .ico { width: 14px; height: 14px; }
 .errtext { color: var(--danger); font-size: 12px; }
 .errblock { min-width: 0; }
