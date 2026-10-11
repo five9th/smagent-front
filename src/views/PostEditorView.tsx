@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { accountsApi } from '../api/accounts'
 import { postsApi } from '../api/posts'
@@ -396,6 +396,11 @@ function Editor({
   )
   const apiAccounts = accounts.filter((a) => a.canPublish)
   const manualAccounts = accounts.filter((a) => !a.canPublish)
+  /** Accounts this post actually went out on (SUCCESS publications) — display only. */
+  const postedAccountIds = useMemo(
+    () => new Set(current?.publications.filter((p) => p.status === 'SUCCESS').map((p) => p.accountId)),
+    [current],
+  )
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<unknown>(null)
   const [publishOpen, setPublishOpen] = useState(false)
@@ -829,6 +834,7 @@ function Editor({
                   />
                   <span className="who" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <b>{a.displayName ?? `account #${a.id}`}</b>
+                    {postedAccountIds.has(a.id) && <Pill value="SUCCESS" label="posted" />}
                     <Pill value={a.status} />
                   </span>
                   <PlatformChip platform={a.platform} />
@@ -879,6 +885,7 @@ function Editor({
                       )}
                       <button
                         className="btn"
+                        style={{ whiteSpace: 'nowrap' }}
                         disabled={!postId}
                         title={postId ? 'Record that you posted there by hand' : 'Save the post first'}
                         onClick={() => setManualFor(a)}
@@ -886,7 +893,8 @@ function Editor({
                         Mark as posted…
                       </button>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                      {postedAccountIds.has(a.id) && <Pill value="SUCCESS" label="posted" />}
                       {a.canShare ? (
                         <button
                           className="btn ghost"
