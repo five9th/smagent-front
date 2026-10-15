@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { accountsApi, type AccountInput } from '../api/accounts'
+import { useEffect, useState } from 'react'
+import { accountsApi, oauthAuthorizePath, type AccountInput } from '../api/accounts'
 import type { AccountDto, AuthMethod, Platform } from '../api/types'
 import { Icon } from '../components/Icon'
 import {
@@ -49,6 +49,50 @@ function AccountFormModal({
   /** Switching the login option requires entering new credentials (backend rule). */
   const methodChanged = editing && authMethod !== account.authMethod
 
+  /**
+   * 3-legged OAuth: create the account (placeholder token) when adding, then
+   * send the browser through the backend authorize redirect — the callback
+   * merges the fresh token and lands back on this page.
+   */
+  const startOauth = async () => {
+    const provider = loginOption.oauth
+    if (provider !== 'linkedin' && provider !== 'x') return
+    setError(null)
+    if (editing) {
+      // token refresh for an existing account — straight to the flow
+      window.location.href = oauthAuthorizePath(provider, account.id)
+      return
+    }
+    for (const f of fields) {
+      if (!f.optional && !f.secret && !(creds[f.key] ?? '').trim()) {
+        setError(`“${f.label}” is needed before starting OAuth.`)
+        return
+      }
+    }
+    setBusy(true)
+    try {
+      const credentials = Object.fromEntries(
+        fields.map((f) => {
+          const value = (creds[f.key] ?? '').trim()
+          if (value) return [f.key, value]
+          // required token fields get a placeholder so the create passes;
+          // the OAuth callback merges the real token in
+          return [f.key, f.secret && !f.optional ? 'oauth-pending' : '']
+        }),
+      )
+      const createdAccount = await accountsApi.create({
+        platform,
+        authMethod,
+        credentials,
+        ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
+      })
+      window.location.href = oauthAuthorizePath(provider, createdAccount.id)
+    } catch (e) {
+      setError(e)
+      setBusy(false)
+    }
+  }
+
   const submit = async () => {
     setError(null)
     try {
@@ -59,12 +103,13 @@ function AccountFormModal({
           fields.filter((f) => (creds[f.key] ?? '').trim() !== '').map((f) => [f.key, creds[f.key].trim()]),
         ) as Record<string, string>
         const anyFilled = Object.keys(filled).length > 0
+        const requiredBlank = fields.filter((f) => !f.optional && (creds[f.key] ?? '').trim() === '')
         if (methodChanged && !anyFilled) {
           setError(`Switching the login option needs the new credentials — fill in “${fields[0].label}” and the rest.`)
           return
         }
-        if (anyFilled && Object.keys(filled).length < fields.length) {
-          setError('Fill in every credential field — updating credentials replaces them all at once.')
+        if (anyFilled && requiredBlank.length) {
+          setError(`“${requiredBlank[0].label}” can’t be left blank — updating credentials replaces them all at once.`)
           return
         }
         await accountsApi.update(account.id, {
@@ -74,7 +119,7 @@ function AccountFormModal({
         toast(anyFilled ? 'Account updated — status reset to UNVERIFIED, verify it again' : 'Account updated')
       } else {
         for (const f of fields) {
-          if (!(creds[f.key] ?? '').trim()) {
+          if (!f.optional && !(creds[f.key] ?? '').trim()) {
             setError(`“${f.label}” is required for ${PLATFORMS[platform].label}.`)
             return
           }
@@ -190,6 +235,39 @@ function AccountFormModal({
           )}
         </label>
       ))}
+      {loginOption.oauth && (
+        <div style={{ marginTop: 12 }}>
+          {loginOption.oauth === 'planned' ? (
+            <>
+              <span className="dim" style={{ display: 'inline-block' }}>
+                <button className="btn" disabled>
+                  <Icon name="external" /> Get token with OAuth
+                </button>
+              </span>{' '}
+              <span className="hint">coming later for Facebook — paste a Page token for now</span>
+            </>
+          ) : editing && methodChanged ? (
+            <>
+              <span className="dim" style={{ display: 'inline-block' }}>
+                <button className="btn" disabled>
+                  <Icon name="external" /> Get token with OAuth
+                </button>
+              </span>{' '}
+              <span className="hint">save the new login option first, then use OAuth</span>
+            </>
+          ) : (
+            <>
+              <button className="btn" disabled={busy} onClick={() => void startOauth()}>
+                {busy ? <Spinner /> : <Icon name="external" />} Get token with OAuth
+              </button>{' '}
+              <span className="hint">
+                opens the {PLATFORMS[platform].label} consent screen — the fresh token is stored
+                automatically, no copy-pasting
+              </span>
+            </>
+          )}
+        </div>
+      )}
       <p className="hint" style={{ margin: '10px 0 0' }}>
         Credentials are entered manually for now — other login options may be added later.
       </p>
@@ -209,6 +287,20 @@ function AccountFormModal({
 
 export default function AccountsView() {
   const toast = useToast()
+  // OAuth callback lands here with ?oauthError=... when the flow failed.
+  const [oauthError, setOauthError] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get('oauthError'),
+  )
+  useEffect(() => {
+    // strip the param so a refresh doesn't re-show the banner
+    const params = new URLSearchParams(window.location.search)
+    const had = params.has('oauthError')
+    params.delete('oauthError')
+    if (had) {
+      const qs = params.toString()
+      window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : ''))
+    }
+  }, [])
   const [showDeleted, setShowDeleted] = useState(false)
   const { data, error, loading, refetch } = useApiQuery(
     () => accountsApi.list(showDeleted),
@@ -255,6 +347,23 @@ export default function AccountsView() {
 
   return (
     <>
+      {oauthError && (
+        <div style={{ position: 'relative', marginBottom: 14 }}>
+          <Callout tone="danger">
+            <b>Getting the token didn’t complete.</b> {oauthError} Open the account’s Edit and use
+            “Get token with OAuth” to retry.
+          </Callout>
+          <button
+            className="xbtn"
+            style={{ position: 'absolute', top: 8, right: 8 }}
+            onClick={() => setOauthError(null)}
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <SectionHead
         title="Connected accounts"
         hint="your credentials are stored securely and never shown in full"

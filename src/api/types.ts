@@ -2,7 +2,12 @@
 
 export type Platform = 'FACEBOOK' | 'REDDIT' | 'X' | 'LINKEDIN'
 
-export type AuthMethod = 'PAGE_ACCESS_TOKEN' | 'PASSWORD_GRANT' | 'PROFILE_URL'
+export type AuthMethod =
+  | 'PAGE_ACCESS_TOKEN'
+  | 'PASSWORD_GRANT'
+  | 'ACCESS_TOKEN'
+  | 'ORGANIZATION_ACCESS_TOKEN'
+  | 'PROFILE_URL'
 export type AccountStatus = 'UNVERIFIED' | 'ACTIVE' | 'INVALID'
 export type PostStatus = 'DRAFT' | 'PUBLISHED'
 export type PublicationStatus = 'PENDING' | 'SUCCESS' | 'FAILED'
