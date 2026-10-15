@@ -231,6 +231,8 @@ input[type=checkbox] { accent-color: var(--gold); width: 15px; height: 15px; fle
 .pick.disabled { opacity: .5; cursor: not-allowed; }
 .pick .who { min-width: 0; flex: 1; }
 .pick .who b { font-size: 12.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick.static { cursor: default; }
+.pick.static:hover { border-color: var(--line); }
 
 /* --- Modal --------------------------------------------------------------- */
 .modal-scrim {

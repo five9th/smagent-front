@@ -5,6 +5,8 @@ Write one post, tailor it per platform, publish to every connected social
 account, and keep the full attempt history. AI assistance (providers,
 generation) and engagement tracking are stubbed until the backend ships them.
 
+[//]: # (TODO: readme should state a backend version the app was built against)
+
 ## Dev
 
 ```bash

@@ -269,68 +269,151 @@ function PublishModal({
   )
 }
 
-/* --- Record-a-by-hand-post modal -------------------------------------------- */
+/* --- Manual publish checklist dialog ---------------------------------------- */
 
-function ManualPublishModal({
-  account,
-  busy,
+function ManualPublishDialog({
+  accounts,
+  postedAccountIds,
+  shareBusy,
+  recordingId,
   onClose,
-  onConfirm,
+  onOpenShare,
+  onRecord,
 }: {
-  account: AccountDto
-  busy: boolean
+  accounts: AccountDto[]
+  /** Accounts the post already went out on (SUCCESS publications). */
+  postedAccountIds: Set<number>
+  /** Account id an "Open to post by hand" is in flight for. */
+  shareBusy: number | null
+  /** Account id a record is in flight for. */
+  recordingId: number | null
   onClose: () => void
-  onConfirm: (externalUrl?: string) => void
+  onOpenShare: (account: AccountDto) => void
+  /** Resolves true when recorded (the row flips to posted). */
+  onRecord: (account: AccountDto, externalUrl?: string) => Promise<boolean>
 }) {
+  const [markingId, setMarkingId] = useState<number | null>(null)
   const [url, setUrl] = useState('')
   const trimmed = url.trim()
   const invalid = trimmed !== '' && !/^https?:\/\//.test(trimmed)
 
+  const closeMarking = () => {
+    setMarkingId(null)
+    setUrl('')
+  }
+
   return (
     <Modal
-      title="Mark as posted by hand"
-      sub={`${PLATFORMS[account.platform].label} · ${account.displayName ?? `account #${account.id}`}`}
-      onClose={busy ? undefined : onClose}
+      title="Manual publish"
+      sub="walk through each account — open, post by hand, record it"
+      onClose={onClose}
       footer={
-        <>
-          <button className="btn ghost" onClick={onClose} disabled={busy}>
-            Cancel
-          </button>
-          <button
-            className="btn primary"
-            disabled={busy || invalid}
-            onClick={() => onConfirm(trimmed || undefined)}
-          >
-            {busy ? <Spinner /> : 'Record'}
-          </button>
-        </>
+        <button className="btn primary" onClick={onClose}>
+          Done
+        </button>
       }
     >
-      <p style={{ fontSize: 12.5, color: 'var(--text-dim)', margin: '0 0 12px' }}>
-        You opened the platform and created the post there yourself. Recording it keeps the history
-        complete — and it counts like a real publish: the post becomes <b>Published</b> and locks.
-      </p>
-      {account.credentialsMasked?.profileUrl && (
-        <p className="hint" style={{ margin: '0 0 12px' }}>
-          Didn’t post yet?{' '}
-          <a href={account.credentialsMasked.profileUrl} target="_blank" rel="noreferrer">
-            Open {account.displayName ?? PLATFORMS[account.platform].label} ↗
-          </a>{' '}
-          first.
-        </p>
-      )}
-      <label className="field">
-        <span className="lab">Link to the created post (optional)</span>
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={`https://${account.platform.toLowerCase()}.com/your-post…`}
-        />
-      </label>
-      {invalid && (
-        <InlineError error={new Error('The link must start with http:// or https://')} title="Check the link" />
-      )}
+      <Callout>
+        <b>1.</b> Open to post by hand — opens the platform composer with this post prefilled.{' '}
+        <b>2.</b> Create the post there. <b>3.</b> Mark as posted to record it in the history — it
+        counts like a real publish.
+      </Callout>
+      <div style={{ marginTop: 12 }}>
+        {accounts.map((a) => {
+          const name = a.displayName ?? `account #${a.id}`
+          const posted = postedAccountIds.has(a.id)
+          const busy = recordingId === a.id
+          return (
+            <div key={a.id} style={{ marginBottom: 14 }}>
+              <div className="pick static" style={{ marginBottom: 6 }}>
+                <PlatformChip platform={a.platform} />
+                <span className="who" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <b>{name}</b>
+                  {posted && <Pill value="SUCCESS" label="posted" />}
+                  <Pill value={a.status} />
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginLeft: 26 }}>
+                {a.canShare ? (
+                  <button
+                    className="btn ghost"
+                    style={{ padding: '4px 10px', fontSize: 11 }}
+                    disabled={shareBusy === a.id || busy}
+                    title="Saves the post if needed, then opens the platform composer with it prefilled"
+                    onClick={() => onOpenShare(a)}
+                  >
+                    {shareBusy === a.id ? <Spinner /> : 'Open to post by hand ↗'}
+                  </button>
+                ) : a.credentialsMasked?.profileUrl ? (
+                  <a
+                    className="btn ghost"
+                    style={{ padding: '4px 10px', fontSize: 11, textDecoration: 'none' }}
+                    href={a.credentialsMasked.profileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={a.credentialsMasked.profileUrl}
+                  >
+                    Open profile ↗
+                  </a>
+                ) : null}
+                {markingId === a.id ? (
+                  <>
+                    <input
+                      type="url"
+                      value={url}
+                      autoFocus
+                      style={{ flex: 1, minWidth: 170, padding: '5px 10px', fontSize: 12 }}
+                      placeholder="Link to the created post (optional)"
+                      onChange={(e) => setUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !invalid && !busy) {
+                          void onRecord(a, trimmed || undefined).then((ok) => ok && closeMarking())
+                        }
+                      }}
+                    />
+                    <button
+                      className="btn primary"
+                      style={{ padding: '4px 10px', fontSize: 11, whiteSpace: 'nowrap' }}
+                      disabled={busy || invalid}
+                      title="Record the by-hand post"
+                      onClick={() => void onRecord(a, trimmed || undefined).then((ok) => ok && closeMarking())}
+                    >
+                      {busy ? <Spinner /> : 'Record'}
+                    </button>
+                    <button
+                      className="btn ghost"
+                      style={{ padding: '4px 10px', fontSize: 11 }}
+                      onClick={closeMarking}
+                      disabled={busy}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="btn ghost"
+                    style={{ padding: '4px 10px', fontSize: 11 }}
+                    disabled={shareBusy === a.id || busy}
+                    title="Record that you posted there by hand"
+                    onClick={() => {
+                      setUrl('')
+                      setMarkingId(a.id)
+                    }}
+                  >
+                    {busy ? <Spinner /> : 'Mark as posted…'}
+                  </button>
+                )}
+              </div>
+              {markingId === a.id && invalid && (
+                <p className="errtext" style={{ margin: '6px 0 0 26px' }}>
+                  The link must start with http:// or https:// — or leave it empty.
+                </p>
+              )}
+            </div>
+          )
+        })}
+        {!accounts.length && <div className="empty">No manual accounts connected.</div>}
+      </div>
     </Modal>
   )
 }
@@ -408,8 +491,9 @@ function Editor({
   const [results, setResults] = useState<PublishResult | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [manualFor, setManualFor] = useState<AccountDto | null>(null)
+  const [manualOpen, setManualOpen] = useState(false)
   const [manualBusy, setManualBusy] = useState(false)
+  const [manualRecordingId, setManualRecordingId] = useState<number | null>(null)
   const [shareBusy, setShareBusy] = useState<number | null>(null)
   /** "Delete publications" — the backend rejects true (501) until platform-side deletion ships. */
   const [deletePublications, setDeletePublications] = useState(false)
@@ -520,18 +604,20 @@ function Editor({
   })
   useEffect(() => () => autosaveOnLeave.current(), [])
 
+  /** Persist pending edits on drafts; resolves to the post id (null on failure). */
+  const ensureSaved = async (): Promise<number | null> => {
+    if (readOnly) return postId // published posts always carry an id
+    const saved = await save({ silent: true })
+    return saved?.id ?? null
+  }
+
   const doPublish = async () => {
     setPublishing(true)
     try {
-      let pid = postId
-      if (!readOnly) {
-        // Publish what's on screen: save pending edits first, so an unsaved
-        // draft never publishes its stale server version.
-        const saved = await save({ silent: true })
-        if (!saved) return
-        pid = saved.id
-      }
-      if (pid == null) return // unreachable: published posts always have an id
+      // Publish what's on screen: save pending edits first, so an unsaved
+      // draft never publishes its stale server version.
+      const pid = await ensureSaved()
+      if (pid == null) return
       const res = await postsApi.publish(pid, targets)
       setResults(res)
       const total = res.results.length
@@ -570,23 +656,28 @@ function Editor({
     }
   }
 
-  const doManualPublish = async (accountId: number, externalUrl?: string) => {
-    if (!postId) return
+  /** Record a by-hand post. Resolves true when recorded (row flips to posted). */
+  const doManualPublish = async (accountId: number, externalUrl?: string): Promise<boolean> => {
+    const pid = await ensureSaved()
+    if (pid == null) return false
     setManualBusy(true)
+    setManualRecordingId(accountId)
     try {
-      const res = await postsApi.publishManual(postId, accountId, externalUrl)
+      const res = await postsApi.publishManual(pid, accountId, externalUrl)
       toast(
         res.results[0]?.publishedManually
           ? `Recorded — posted by hand on ${res.results[0].accountName}`
           : 'Recorded',
       )
-      setManualFor(null)
       if (post) refresh()
-      else postsApi.get(postId).then(setCreated).catch(() => {})
+      else postsApi.get(pid).then(setCreated).catch(() => {})
+      return true
     } catch (e) {
       toast(describeError(e), 'error')
+      return false
     } finally {
       setManualBusy(false)
+      setManualRecordingId(null)
     }
   }
 
@@ -596,13 +687,8 @@ function Editor({
     try {
       // The composer is prefilled from the saved post — persist edits first so
       // it always shows what's on screen.
-      let pid = postId
-      if (!readOnly) {
-        const saved = await save({ silent: true })
-        if (!saved) return
-        pid = saved.id
-      }
-      if (pid == null) return // unreachable: published posts always have an id
+      const pid = await ensureSaved()
+      if (pid == null) return
       const { url } = await postsApi.shareUrl(pid, account.id)
       // Facebook/LinkedIn composers don't take prefilled text — hand it over
       // via the clipboard so it's one paste away.
@@ -845,16 +931,22 @@ function Editor({
 
           {manualAccounts.length > 0 && (
             <div className="card pad">
-              <div className="eyebrow" style={{ marginBottom: 10 }}>
-                Manual accounts — open &amp; post by hand
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div className="eyebrow" style={{ flex: 1 }}>
+                  Manual accounts — open &amp; post by hand
+                </div>
+                <button className="btn" onClick={() => setManualOpen(true)}>
+                  <Icon name="external" />
+                  Manual publish…
+                </button>
               </div>
               {manualAccounts.map((a) => {
                 const profileUrl = a.credentialsMasked?.profileUrl
                 const name = a.displayName ?? `account #${a.id}`
                 return (
-                  <div key={a.id} style={{ marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <PlatformChip platform={a.platform} />
+                  <div key={a.id} className="pick static" style={{ marginBottom: 6 }}>
+                    <PlatformChip platform={a.platform} />
+                    <span className="who" style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                       {profileUrl ? (
                         <a
                           href={profileUrl}
@@ -864,7 +956,6 @@ function Editor({
                           style={{
                             fontSize: 12.5,
                             fontWeight: 600,
-                            flex: 1,
                             minWidth: 0,
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -876,54 +967,18 @@ function Editor({
                           {name}
                         </a>
                       ) : (
-                        <b
-                          style={{ fontSize: 12.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                          title={name}
-                        >
+                        <b style={{ fontSize: 12.5, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>
                           {name}
                         </b>
                       )}
-                      <button
-                        className="btn"
-                        style={{ whiteSpace: 'nowrap' }}
-                        disabled={!postId}
-                        title={postId ? 'Record that you posted there by hand' : 'Save the post first'}
-                        onClick={() => setManualFor(a)}
-                      >
-                        Mark as posted…
-                      </button>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
                       {postedAccountIds.has(a.id) && <Pill value="SUCCESS" label="posted" />}
-                      {a.canShare ? (
-                        <button
-                          className="btn ghost"
-                          style={{ padding: '4px 10px', fontSize: 11 }}
-                          disabled={shareBusy === a.id || saving}
-                          title="Saves the post if needed, then opens the platform composer with it prefilled"
-                          onClick={() => void openShare(a)}
-                        >
-                          {shareBusy === a.id ? <Spinner /> : 'Open to post by hand ↗'}
-                        </button>
-                      ) : profileUrl ? (
-                        <a
-                          className="btn ghost"
-                          style={{ padding: '4px 10px', fontSize: 11, textDecoration: 'none' }}
-                          href={profileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={profileUrl}
-                        >
-                          Open profile ↗
-                        </a>
-                      ) : null}
-                    </div>
+                      <Pill value={a.status} />
+                    </span>
                   </div>
                 )
               })}
-              <p className="hint" style={{ margin: 0 }}>
-                These have no API access: open the link, create the post there, then mark it as posted to
-                keep the history complete.
+              <p className="hint" style={{ margin: '10px 0 0' }}>
+                No API access — use Manual publish to open each composer and record the by-hand posts.
               </p>
             </div>
           )}
@@ -1038,12 +1093,15 @@ function Editor({
         </>
       )}
 
-      {manualFor && (
-        <ManualPublishModal
-          account={manualFor}
-          busy={manualBusy}
-          onClose={() => setManualFor(null)}
-          onConfirm={(externalUrl) => void doManualPublish(manualFor.id, externalUrl)}
+      {manualOpen && (
+        <ManualPublishDialog
+          accounts={manualAccounts}
+          postedAccountIds={postedAccountIds}
+          shareBusy={shareBusy}
+          recordingId={manualBusy ? manualRecordingId : null}
+          onClose={() => setManualOpen(false)}
+          onOpenShare={(a) => void openShare(a)}
+          onRecord={(a, url) => doManualPublish(a.id, url)}
         />
       )}
 
