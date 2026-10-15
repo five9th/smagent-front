@@ -887,6 +887,28 @@ function Editor({
                 Unsaved changes.
               </p>
             )}
+
+            <div className="btn-row" style={{ marginTop: 14 }}>
+              {!readOnly && (
+                <button
+                  className="btn primary"
+                  onClick={() => void save({ navigateAfterCreate: true })}
+                  disabled={saving}
+                >
+                  {saving ? <Spinner /> : postId ? 'Save changes' : 'Save draft'}
+                </button>
+              )}
+              <button
+                className="btn danger"
+                onClick={() => {
+                  setDeletePublications(false)
+                  setDeleteOpen(true)
+                }}
+              >
+                <Icon name="trash" />
+                Delete
+              </button>
+            </div>
           </div>
 
           <PreviewCard
@@ -927,18 +949,24 @@ function Editor({
                 </label>
               ))
             )}
+            <div className="btn-row" style={{ marginTop: 10 }}>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setResults(null)
+                  setPublishOpen(true)
+                }}
+                disabled={!apiAccounts.length}
+              >
+                {readOnly ? 'Republish…' : 'Publish…'}
+              </button>
+            </div>
           </div>
 
           {manualAccounts.length > 0 && (
             <div className="card pad">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                <div className="eyebrow" style={{ flex: 1 }}>
-                  Manual accounts — open &amp; post by hand
-                </div>
-                <button className="btn" onClick={() => setManualOpen(true)}>
-                  <Icon name="external" />
-                  Manual publish…
-                </button>
+              <div className="eyebrow" style={{ marginBottom: 10 }}>
+                Manual accounts — open &amp; post by hand
               </div>
               {manualAccounts.map((a) => {
                 const profileUrl = a.credentialsMasked?.profileUrl
@@ -977,9 +1005,12 @@ function Editor({
                   </div>
                 )
               })}
-              <p className="hint" style={{ margin: '10px 0 0' }}>
-                No API access — use Manual publish to open each composer and record the by-hand posts.
-              </p>
+              <div className="btn-row" style={{ marginTop: 10 }}>
+                <button className="btn" onClick={() => setManualOpen(true)}>
+                  <Icon name="external" />
+                  Manual publish…
+                </button>
+              </div>
             </div>
           )}
 
@@ -997,47 +1028,6 @@ function Editor({
             </p>
           </div>
 
-          <div className="card pad">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>
-              Actions
-            </div>
-            <div className="btn-row">
-              {!readOnly && (
-                <button
-                  className="btn primary"
-                  onClick={() => void save({ navigateAfterCreate: true })}
-                  disabled={saving}
-                >
-                  {saving ? <Spinner /> : postId ? 'Save changes' : 'Save draft'}
-                </button>
-              )}
-              <button
-                className="btn primary"
-                onClick={() => {
-                  setResults(null)
-                  setPublishOpen(true)
-                }}
-                disabled={!accounts.length}
-              >
-                {readOnly ? 'Republish…' : 'Publish…'}
-              </button>
-              <button
-                className="btn danger"
-                onClick={() => {
-                  setDeletePublications(false)
-                  setDeleteOpen(true)
-                }}
-              >
-                <Icon name="trash" />
-                Delete
-              </button>
-            </div>
-            <p className="hint" style={{ margin: '10px 0 0' }}>
-              {readOnly
-                ? 'Deleting removes the post from the app — its history is kept, and copies already on social platforms stay.'
-                : 'Publishing sends the post to each selected account separately — it’s marked Published as soon as one of them succeeds.'}
-            </p>
-          </div>
         </div>
       </div>
 
