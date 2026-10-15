@@ -103,7 +103,7 @@ function PreviewCard({
         <div className="av">{meta.label[0]}</div>
         <div>
           <div className="pn">{account?.displayName ?? meta.label}</div>
-          <div className="pt">{meta.label} · preview</div>
+          <div className="pt">{meta.label} · preview - beta</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
           {PLATFORM_LIST.map((p) => (
