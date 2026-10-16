@@ -810,9 +810,23 @@ function Editor({
                     type="checkbox"
                     checked={form.ovr[tab].on}
                     disabled={readOnly}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], on: e.target.checked } } }))
-                    }
+                    onChange={(e) => {
+                      const on = e.target.checked
+                      setForm((f) => {
+                        // Seed the override with the generic text so it starts as a tweak, not a blank page.
+                        if (on && !f.ovr[tab].text.trim() && f.text.trim()) {
+                          const max = PLATFORMS[tab].maxLength
+                          const seeded = f.text.slice(0, max)
+                          if (seeded.length < f.text.length)
+                            toast(
+                              `${PLATFORMS[tab].label} limit is ${max.toLocaleString('en-US')} chars — generic text was trimmed to fit`,
+                              'error',
+                            )
+                          return { ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], on, text: seeded } } }
+                        }
+                        return { ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], on } } }
+                      })
+                    }}
                   />
                   <span style={{ fontSize: 12.5 }}>
                     Override content for <b>{PLATFORMS[tab].label}</b> (character limit{' '}
