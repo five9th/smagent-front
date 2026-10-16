@@ -119,7 +119,7 @@ function PreviewCard({
           ))}
         </div>
       </div>
-      {title.trim() && (
+      {platform === 'REDDIT' && title.trim() && (
         <div className="pbody" style={{ fontWeight: 600, marginBottom: 6 }}>
           {title}
         </div>
@@ -819,23 +819,25 @@ function Editor({
                     {PLATFORMS[tab].maxLength.toLocaleString('en-US')})
                   </span>
                 </label>
-                <label className="field">
-                  <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ flex: 1 }}>
-                      {PLATFORMS[tab].label} title — optional, falls back to the generic title when empty
+                {tab === 'REDDIT' && (
+                  <label className="field">
+                    <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ flex: 1 }}>
+                        {PLATFORMS[tab].label} title — required, falls back to the generic title when empty
+                      </span>
+                      <CopyButton value={form.ovr[tab].title} />
                     </span>
-                    <CopyButton value={form.ovr[tab].title} />
-                  </span>
-                  <input
-                    type="text"
-                    value={form.ovr[tab].title}
-                    disabled={readOnly || !form.ovr[tab].on}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], title: e.target.value } } }))
-                    }
-                    placeholder={form.ovr[tab].on ? form.title || 'no generic title either' : '—'}
-                  />
-                </label>
+                    <input
+                      type="text"
+                      value={form.ovr[tab].title}
+                      disabled={readOnly || !form.ovr[tab].on}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, ovr: { ...f.ovr, [tab]: { ...f.ovr[tab], title: e.target.value } } }))
+                      }
+                      placeholder={form.ovr[tab].on ? form.title || 'no generic title either' : '—'}
+                    />
+                  </label>
+                )}
                 <label className="field">
                   <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ flex: 1 }}>
