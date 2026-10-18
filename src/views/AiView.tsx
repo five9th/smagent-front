@@ -375,7 +375,6 @@ export default function AiView() {
         )
       ) : (
         <GeneratePanel
-          mode="page"
           providers={providers}
           loading={loading && !data}
           refreshProviders={refetch}

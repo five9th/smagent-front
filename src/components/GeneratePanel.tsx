@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { aiApi, type GenerateInput } from '../api/ai'
 import { ApiError } from '../api/client'
 import type {
@@ -23,11 +22,9 @@ import { Icon } from './Icon'
 import { PostPreview, type PreviewTab } from './PostPreview'
 import { ValuePicker, type Suggestion } from './ValuePicker'
 import {
-  Callout,
   CopyButton,
   InlineError,
   Loading,
-  Modal,
   PlatformChip,
   SectionHead,
   Spinner,
@@ -100,40 +97,36 @@ function VariantBlock({
 }
 
 /**
- * The single generate UI, shared by the /ai page (mode="page") and the post
- * editor's AI-assist modal (mode="modal"). All form state lives here; the
- * parent supplies the provider list and receives results via callbacks.
+ * The single generate UI, a tab on the /ai page and on the post editor page.
+ * All form state lives here, so the parent can keep the panel mounted and
+ * switch to it without losing anything. Passing `onApply` (editor) turns the
+ * result actions into Apply buttons; otherwise (the /ai tab) the result is
+ * handed over via `onOpenInEditor`. `draft` (editor), when non-null, adds the
+ * "Show draft to AI" consent toggle and sends editorState with the request.
  */
 export function GeneratePanel({
-  mode,
   providers,
   loading,
   refreshProviders,
-  initialPrompt = '',
   draft = null,
-  onClose,
   onApply,
   onOpenInEditor,
   onGoToProviders,
 }: {
-  mode: 'page' | 'modal'
   providers: AiProviderDto[]
   loading: boolean
   refreshProviders: () => void
-  /** Optional text to seed the prompt field with. */
-  initialPrompt?: string
   /**
-   * Editor mode: current draft content (null when there's nothing to show) —
-   * with the user's consent it rides along so the AI edits instead of
-   * drafting from scratch.
+   * Current draft content (null when there's nothing to show) — with the
+   * user's consent it rides along so the AI edits instead of drafting from
+   * scratch.
    */
   draft?: Partial<Record<GeneratePlatform, PostContent>> | null
-  onClose?: () => void
   onApply?: (result: GenerateResult, which: ApplyTarget) => void
   onOpenInEditor?: (seed: AiDraftSeed) => void
   onGoToProviders?: () => void
 }) {
-  const [prompt, setPrompt] = useState(initialPrompt)
+  const [prompt, setPrompt] = useState('')
   const [tone, setTone] = useState('')
   const [maxLength, setMaxLength] = useState('')
   const [effort, setEffort] = useState<GenerateEffort>('LOW')
@@ -167,25 +160,10 @@ export function GeneratePanel({
   const effortQuery = useApiQuery(() => aiApi.effortLevels(), ['ai-effort-levels'])
   const effortLevels = effortQuery.data ?? EFFORTS
 
-  if (loading) {
-    return mode === 'modal' ? (
-      <Modal title="Generate with AI" onClose={onClose}>
-        <Loading />
-      </Modal>
-    ) : (
-      <Loading />
-    )
-  }
+  if (loading) return <Loading />
 
   if (!providers.length) {
-    return mode === 'modal' ? (
-      <Modal title="Generate with AI" onClose={onClose}>
-        <Callout tone="warn">
-          <b>No AI provider configured.</b> Add one on the AI page first — the key is stored
-          encrypted and never shown in full. <Link to="/ai">Go there →</Link>
-        </Callout>
-      </Modal>
-    ) : (
+    return (
       <div className="card pad">
         <div className="empty">
           No AI providers yet — add an API key to start generating.
@@ -252,10 +230,10 @@ export function GeneratePanel({
     }
   }
 
-  /* --- Field chunks, composed differently per mode ------------------------- */
+  /* --- Field chunks --------------------------------------------------------- */
 
-  // Top of the dialog: consent to sharing the current draft with the AI.
-  // Only offered when there is something to show (editor mode with content).
+  // Consent to sharing the current draft with the AI — only offered when
+  // there is something to show (editor with content).
   const draftToggle = draft != null && (
     <label
       style={{
@@ -464,21 +442,21 @@ export function GeneratePanel({
           {result.usage.outputTokens.toLocaleString('en-US')} out tokens
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          {mode === 'page' ? (
-            <button className="btn primary" onClick={() => onOpenInEditor?.(seedFrom(result))}>
-              <Icon name="edit" /> Open in post editor
+          {onApply ? (
+            <button className="btn primary" onClick={() => onApply(result, 'all')}>
+              Apply all
             </button>
           ) : (
-            <button className="btn primary" onClick={() => onApply?.(result, 'all')}>
-              Apply all
+            <button className="btn primary" onClick={() => onOpenInEditor?.(seedFrom(result))}>
+              <Icon name="edit" /> Open in post editor
             </button>
           )}
         </span>
       </div>
       <p className="hint" style={{ margin: '6px 0 12px' }}>
-        {mode === 'page'
-          ? 'Not saved anywhere yet — it becomes a draft once you open it in the editor.'
-          : 'Applied straight into the draft — nothing is posted automatically.'}
+        {onApply
+          ? 'Applied straight into the draft — nothing is posted automatically.'
+          : 'Not saved anywhere yet — it becomes a draft once you open it in the editor.'}
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {variants.map(({ tab, content }) => (
@@ -486,34 +464,12 @@ export function GeneratePanel({
             key={tab}
             tab={tab}
             content={content}
-            onApply={mode === 'modal' ? () => onApply?.(result, tab) : undefined}
+            onApply={onApply ? () => onApply(result, tab) : undefined}
           />
         ))}
       </div>
     </div>
   )
-
-  if (mode === 'modal') {
-    return (
-      <Modal
-        wide
-        title="Generate with AI"
-        sub="the result lands in your draft — nothing is posted automatically"
-        onClose={busy ? undefined : onClose}
-      >
-        {draftToggle}
-        {promptField}
-        {constraintsRow}
-        {providerField}
-        {modelField}
-        {effortField}
-        {platformsBlock}
-        {actionsRow}
-        {errorBlock}
-        {resultsCard}
-      </Modal>
-    )
-  }
 
   return (
     <>
@@ -521,6 +477,7 @@ export function GeneratePanel({
         title="Generate post text"
         hint="AI only generates text — images stay manual for now"
       />
+      {draftToggle}
       <div className="composer-grid">
         <div className="card pad">
           {promptField}

@@ -484,10 +484,13 @@ function Editor({
   const [shareBusy, setShareBusy] = useState<number | null>(null)
   /** "Delete publications" — the backend rejects true (501) until platform-side deletion ships. */
   const [deletePublications, setDeletePublications] = useState(false)
-  // AI assist: provider list (also feeds the generate modal) + modal open flag.
+  // AI tab: the provider list feeds the GeneratePanel. The panel mounts lazily
+  // on the first AI-tab visit and then stays mounted (hidden while editing),
+  // so switching the Edit/AI tabs never loses its state.
   const providersQuery = useApiQuery(() => aiApi.list(), ['ai-providers'])
   const providers = providersQuery.data ?? []
-  const [aiOpen, setAiOpen] = useState(false)
+  const [page, setPage] = useState<'edit' | 'ai'>('edit')
+  const [aiVisited, setAiVisited] = useState(false)
 
   const dirty = !readOnly && JSON.stringify(form) !== baseline
 
@@ -726,7 +729,7 @@ function Editor({
         ovr,
       }
     })
-    setAiOpen(false)
+    setPage('edit')
     toast(
       which === 'all'
         ? 'AI text applied to the draft'
@@ -758,6 +761,24 @@ function Editor({
         </Callout>
       )}
 
+      {!readOnly && (
+        <div className="tabs" style={{ marginBottom: 14 }}>
+          <button className={page === 'edit' ? 'active' : ''} onClick={() => setPage('edit')}>
+            Edit
+          </button>
+          <button
+            className={page === 'ai' ? 'active' : ''}
+            onClick={() => {
+              setPage('ai')
+              setAiVisited(true)
+            }}
+          >
+            AI
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: page === 'edit' ? undefined : 'none' }}>
       <div className="composer-grid">
         {/* Editor + preview */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
@@ -1065,53 +1086,6 @@ function Editor({
             </div>
           )}
 
-          {!readOnly && (
-            <div className="card pad">
-              <div className="eyebrow" style={{ marginBottom: 10 }}>
-                AI assist
-              </div>
-              {providersQuery.error != null && providersQuery.data === undefined ? (
-                <p className="hint" style={{ margin: 0 }}>
-                  Couldn’t load AI providers.{' '}
-                  <button
-                    className="btn ghost"
-                    style={{ padding: '2px 8px', fontSize: 11 }}
-                    onClick={providersQuery.refetch}
-                  >
-                    Retry
-                  </button>
-                </p>
-              ) : providersQuery.data === undefined ? (
-                <p className="hint" style={{ margin: 0 }}>
-                  Checking AI providers…
-                </p>
-              ) : providers.length === 0 ? (
-                <p className="hint" style={{ margin: 0 }}>
-                  No AI provider configured. <Link to="/ai">Add one →</Link>
-                </p>
-              ) : (
-                <>
-                  <button
-                    className="btn"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={() => setAiOpen(true)}
-                  >
-                    <Icon name="ai" /> Generate text with AI
-                  </button>
-                  <p className="hint" style={{ margin: '8px 0 0' }}>
-                    {providers.length === 1 ? (
-                      <>
-                        uses <b>{providers[0].name}</b> — manage providers on the{' '}
-                        <Link to="/ai">AI page</Link>
-                      </>
-                    ) : (
-                      `${providers.length} providers — pick one when generating`
-                    )}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
 
         </div>
       </div>
@@ -1167,17 +1141,19 @@ function Editor({
           </div>
         </>
       )}
+      </div>
 
-      {aiOpen && !readOnly && (
-        <GeneratePanel
-          mode="modal"
-          providers={providers}
-          loading={providersQuery.data === undefined && providersQuery.loading}
-          refreshProviders={providersQuery.refetch}
-          draft={aiDraftFromForm(form)}
-          onClose={() => setAiOpen(false)}
-          onApply={applyGenerated}
-        />
+      {!readOnly && aiVisited && (
+        <div style={{ display: page === 'ai' ? undefined : 'none' }}>
+          <GeneratePanel
+            providers={providers}
+            loading={providersQuery.data === undefined && providersQuery.loading}
+            refreshProviders={providersQuery.refetch}
+            draft={aiDraftFromForm(form)}
+            onApply={applyGenerated}
+            onGoToProviders={() => nav('/ai')}
+          />
+        </div>
       )}
 
       {manualOpen && (
