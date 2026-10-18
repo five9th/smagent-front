@@ -1,0 +1,480 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { aiApi, type GenerateInput } from '../api/ai'
+import { ApiError } from '../api/client'
+import type {
+  AiProviderDto,
+  GenerateEffort,
+  GeneratePlatform,
+  GenerateResult,
+  GeneratedTextDto,
+  Platform,
+} from '../api/types'
+import {
+  rememberModel,
+  rememberProviderId,
+  rememberedModel,
+  rememberedProviderId,
+} from '../lib/aiPrefs'
+import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
+import { Icon } from './Icon'
+import { PostPreview, type PreviewTab } from './PostPreview'
+import {
+  Callout,
+  CopyButton,
+  InlineError,
+  Loading,
+  Modal,
+  PlatformChip,
+  SectionHead,
+  Spinner,
+} from './ui'
+
+/** Which part of a generation result an editor apply targets. */
+export type ApplyTarget = 'all' | 'GENERIC' | Platform
+
+/** A generation result handed to the post editor (the /ai → editor flow). */
+export interface AiDraftSeed {
+  title: string
+  text: string
+  overrides: Partial<Record<Platform, GeneratedTextDto>>
+}
+
+const EFFORTS: GenerateEffort[] = ['LOW', 'MEDIUM', 'HIGH', 'XHIGH', 'MAX']
+const EFFORT_LABELS: Record<GenerateEffort, string> = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  XHIGH: 'extra high',
+  MAX: 'max',
+}
+const TONE_PRESETS = ['casual', 'professional', 'playful']
+const GENERATE_PLATFORMS: GeneratePlatform[] = ['GENERIC', ...PLATFORM_LIST]
+
+function GenericChip() {
+  return (
+    <span className="chan">
+      <span className="g g-generic">G</span>
+      Generic
+    </span>
+  )
+}
+
+function seedFrom(r: GenerateResult): AiDraftSeed {
+  return { title: r.content?.title ?? '', text: r.content?.text ?? '', overrides: r.overrides }
+}
+
+/** One generated variant: chip + copy/apply affordances + the shared preview. */
+function VariantBlock({
+  tab,
+  content,
+  onApply,
+}: {
+  tab: PreviewTab
+  content: GeneratedTextDto
+  onApply?: () => void
+}) {
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        {tab === 'GENERIC' ? <GenericChip /> : <PlatformChip platform={tab} />}
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <CopyButton value={content.text} />
+          {onApply && (
+            <button className="btn" style={{ padding: '4px 10px', fontSize: 11 }} onClick={onApply}>
+              Apply
+            </button>
+          )}
+        </span>
+      </div>
+      <PostPreview
+        tab={tab}
+        contentFor={() => ({ title: content.title ?? '', text: content.text, link: '' })}
+        placeholder="The model returned no text."
+      />
+    </div>
+  )
+}
+
+/**
+ * The single generate UI, shared by the /ai page (mode="page") and the post
+ * editor's AI-assist modal (mode="modal"). All form state lives here; the
+ * parent supplies the provider list and receives results via callbacks.
+ */
+export function GeneratePanel({
+  mode,
+  providers,
+  loading,
+  refreshProviders,
+  initialPrompt = '',
+  onClose,
+  onApply,
+  onOpenInEditor,
+  onGoToProviders,
+}: {
+  mode: 'page' | 'modal'
+  providers: AiProviderDto[]
+  loading: boolean
+  refreshProviders: () => void
+  /** Editor mode: seed the prompt with the current generic text. */
+  initialPrompt?: string
+  onClose?: () => void
+  onApply?: (result: GenerateResult, which: ApplyTarget) => void
+  onOpenInEditor?: (seed: AiDraftSeed) => void
+  onGoToProviders?: () => void
+}) {
+  const [prompt, setPrompt] = useState(initialPrompt)
+  const [tone, setTone] = useState('')
+  const [maxLength, setMaxLength] = useState('')
+  const [effort, setEffort] = useState<GenerateEffort>('LOW')
+  const [platforms, setPlatforms] = useState<Set<GeneratePlatform>>(() => new Set(['GENERIC']))
+  const [chosenId, setChosenId] = useState<number | ''>(() => rememberedProviderId() ?? '')
+  const [model, setModel] = useState(rememberedModel)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<unknown>(null)
+  const [result, setResult] = useState<GenerateResult | null>(null)
+
+  const multiple = providers.length > 1
+  // A remembered provider that no longer exists (deleted elsewhere) is ignored;
+  // the next explicit choice overwrites the stale stored key.
+  const providerId =
+    multiple && chosenId !== '' && !providers.some((p) => p.id === chosenId) ? '' : chosenId
+
+  const selected =
+    providers.length === 1 ? providers[0] : providers.find((p) => p.id === providerId)
+
+  if (loading) {
+    return mode === 'modal' ? (
+      <Modal title="Generate with AI" onClose={onClose}>
+        <Loading />
+      </Modal>
+    ) : (
+      <Loading />
+    )
+  }
+
+  if (!providers.length) {
+    return mode === 'modal' ? (
+      <Modal title="Generate with AI" onClose={onClose}>
+        <Callout tone="warn">
+          <b>No AI provider configured.</b> Add one on the AI page first — the key is stored
+          encrypted and never shown in full. <Link to="/ai">Go there →</Link>
+        </Callout>
+      </Modal>
+    ) : (
+      <div className="card pad">
+        <div className="empty">
+          No AI providers yet — add an API key to start generating.
+          <div style={{ marginTop: 10 }}>
+            <button className="btn primary" onClick={onGoToProviders}>
+              <Icon name="plus" /> Add a provider
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const togglePlatform = (p: GeneratePlatform) => {
+    setPlatforms((ps) => {
+      if (!ps.has(p)) return new Set(ps).add(p)
+      if (ps.size === 1) return ps // never empty — the backend rejects an empty set
+      const next = new Set(ps)
+      next.delete(p)
+      return next
+    })
+  }
+
+  const generateDisabled =
+    busy || !prompt.trim() || platforms.size === 0 || (multiple && providerId === '')
+
+  const doGenerate = async () => {
+    setError(null)
+    setBusy(true)
+    try {
+      // Omitted when unset; an unparsable max length counts as unset.
+      const parsed = Number.parseInt(maxLength, 10)
+      const maxLen = Number.isFinite(parsed) && parsed > 0 ? parsed : null
+      const input: GenerateInput = {
+        prompt: prompt.trim(),
+        platforms: [...platforms],
+        ...(tone || maxLen
+          ? {
+              constraints: {
+                ...(tone ? { tone } : {}),
+                ...(maxLen ? { maxLength: maxLen } : {}),
+              },
+            }
+          : {}),
+        // Exactly one provider: let the backend infer it.
+        ...(multiple && providerId !== '' ? { providerId } : {}),
+        ...(model.trim() ? { model: model.trim() } : {}),
+        effort,
+      }
+      setResult(await aiApi.generate(input))
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        // The chosen provider vanished (deleted elsewhere) — forget it, reload.
+        rememberProviderId(null)
+        setChosenId('')
+        refreshProviders()
+        setError('That provider no longer exists — pick another one.')
+      } else {
+        setError(e)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /* --- Field chunks, composed differently per mode ------------------------- */
+
+  const promptField = (
+    <label className="field">
+      <span className="lab">What should the post say?</span>
+      <textarea
+        rows={4}
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="e.g. Post about releasing v2 of our CLI tool"
+      />
+    </label>
+  )
+
+  const constraintsRow = (
+    <div className="grid cols-2">
+      <label className="field">
+        <span className="lab">Tone (optional)</span>
+        <select value={tone} onChange={(e) => setTone(e.target.value)}>
+          <option value="">any tone</option>
+          {TONE_PRESETS.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="field">
+        <span className="lab">Max length (optional)</span>
+        <input
+          type="number"
+          min={1}
+          value={maxLength}
+          onChange={(e) => setMaxLength(e.target.value)}
+          placeholder="platform default"
+        />
+      </label>
+    </div>
+  )
+
+  const providerField =
+    providers.length === 1 ? (
+      <div className="field">
+        <span className="lab">Provider</span>
+        <div style={{ fontSize: 12.5 }}>
+          <b>{providers[0].name}</b>{' '}
+          <span className="hint">— the only one configured, used automatically</span>
+        </div>
+      </div>
+    ) : (
+      <label className="field">
+        <span className="lab">Provider</span>
+        <select
+          value={providerId}
+          onChange={(e) => {
+            const v = e.target.value === '' ? '' : Number(e.target.value)
+            setChosenId(v)
+            rememberProviderId(v === '' ? null : v)
+          }}
+        >
+          <option value="">choose a provider…</option>
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    )
+
+  const modelField = (
+    <label className="field">
+      <span className="lab">Model (optional)</span>
+      <input
+        type="text"
+        value={model}
+        onChange={(e) => {
+          setModel(e.target.value)
+          rememberModel(e.target.value)
+        }}
+        placeholder={selected?.defaultModel ?? 'claude-sonnet-5'}
+      />
+      <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+        Free text — providers can’t list their models yet. Empty uses the provider’s default.
+      </span>
+    </label>
+  )
+
+  const effortField = (
+    <label className="field">
+      <span className="lab">Reasoning effort</span>
+      <select value={effort} onChange={(e) => setEffort(e.target.value as GenerateEffort)}>
+        {EFFORTS.map((lvl) => (
+          <option key={lvl} value={lvl}>
+            {EFFORT_LABELS[lvl]}
+          </option>
+        ))}
+      </select>
+      <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+        How hard the model thinks it over — higher is slower and more thorough.
+      </span>
+    </label>
+  )
+
+  const platformsBlock = (
+    <div className="field">
+      <span className="lab">Variants</span>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {GENERATE_PLATFORMS.map((p) => {
+          const on = platforms.has(p)
+          return (
+            <button
+              key={p}
+              type="button"
+              className="btn ghost"
+              style={{
+                padding: '5px 10px',
+                fontSize: 11.5,
+                borderColor: on ? 'var(--gold-line)' : undefined,
+                color: on ? 'var(--text)' : undefined,
+              }}
+              title={
+                p === 'GENERIC'
+                  ? 'the shared text platforms fall back to'
+                  : `${PLATFORMS[p].label} gets its own variant`
+              }
+              onClick={() => togglePlatform(p)}
+            >
+              {p === 'GENERIC' ? <GenericChip /> : <PlatformChip platform={p} />}
+            </button>
+          )
+        })}
+      </div>
+      <span className="hint" style={{ display: 'block', marginTop: 6 }}>
+        Every checked entry gets its own variant — Generic is the text the others fall back to.
+        {platforms.has('REDDIT') && ' Reddit also gets a title (required there).'}
+      </span>
+    </div>
+  )
+
+  const actionsRow = (
+    <div className="btn-row" style={{ marginTop: 12 }}>
+      <button className="btn primary" onClick={() => void doGenerate()} disabled={generateDisabled}>
+        {busy ? <Spinner /> : <Icon name="ai" />}
+        {busy ? 'Generating…' : 'Generate'}
+      </button>
+      {busy && (
+        <span className="hint" style={{ alignSelf: 'center' }}>
+          can take up to a minute at higher reasoning effort
+        </span>
+      )}
+    </div>
+  )
+
+  const errorBlock = error != null && <InlineError error={error} />
+
+  const variants: Array<{ tab: PreviewTab; content: GeneratedTextDto }> = []
+  if (result?.content) variants.push({ tab: 'GENERIC', content: result.content })
+  for (const p of PLATFORM_LIST) {
+    const g = result?.overrides[p]
+    if (g) variants.push({ tab: p, content: g })
+  }
+
+  const resultsCard = result && (
+    <div className="card pad">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <b>Generated</b>
+        <span className="meta mono" style={{ color: 'var(--text-mute)', fontSize: 11 }}>
+          via {result.provider} · {result.model} ·{' '}
+          {result.usage.inputTokens.toLocaleString('en-US')} in /{' '}
+          {result.usage.outputTokens.toLocaleString('en-US')} out tokens
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          {mode === 'page' ? (
+            <button className="btn primary" onClick={() => onOpenInEditor?.(seedFrom(result))}>
+              <Icon name="edit" /> Open in post editor
+            </button>
+          ) : (
+            <button className="btn primary" onClick={() => onApply?.(result, 'all')}>
+              Apply all
+            </button>
+          )}
+        </span>
+      </div>
+      <p className="hint" style={{ margin: '6px 0 12px' }}>
+        {mode === 'page'
+          ? 'Not saved anywhere yet — it becomes a draft once you open it in the editor.'
+          : 'Applied straight into the draft — nothing is posted automatically.'}
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {variants.map(({ tab, content }) => (
+          <VariantBlock
+            key={tab}
+            tab={tab}
+            content={content}
+            onApply={mode === 'modal' ? () => onApply?.(result, tab) : undefined}
+          />
+        ))}
+      </div>
+    </div>
+  )
+
+  if (mode === 'modal') {
+    return (
+      <Modal
+        wide
+        title="Generate with AI"
+        sub="the result lands in your draft — nothing is posted automatically"
+        onClose={busy ? undefined : onClose}
+      >
+        {promptField}
+        {constraintsRow}
+        {providerField}
+        {modelField}
+        {effortField}
+        {platformsBlock}
+        {actionsRow}
+        {errorBlock}
+        {resultsCard}
+      </Modal>
+    )
+  }
+
+  return (
+    <>
+      <SectionHead
+        title="Generate post text"
+        hint="AI only generates text — images stay manual for now"
+      />
+      <div className="composer-grid">
+        <div className="card pad">
+          {promptField}
+          {constraintsRow}
+          {actionsRow}
+          {errorBlock}
+        </div>
+        <div className="card pad">
+          <div className="eyebrow" style={{ marginBottom: 10 }}>
+            Provider &amp; model
+          </div>
+          {providerField}
+          {modelField}
+          {effortField}
+          <div style={{ height: 8 }} />
+          {platformsBlock}
+        </div>
+        {resultsCard && <div style={{ gridColumn: '1 / -1' }}>{resultsCard}</div>}
+      </div>
+    </>
+  )
+}

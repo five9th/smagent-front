@@ -173,8 +173,9 @@ export default function DashboardView() {
               reported one by one. <Link to="/posts/new">Create a post →</Link>
             </Callout>
             <Callout>
-              <b>AI assistance is on the way.</b> You’ll be able to connect AI providers, switch between
-              them, and draft post text with AI. <Link to="/ai">See what’s coming →</Link>
+              <b>Draft with AI.</b> Connect a provider and generate post text — the generic version
+              plus per-platform variants — then edit and publish as usual.{' '}
+              <Link to="/ai">Try it →</Link>
             </Callout>
             <Callout tone="warn">
               <b>An engagement inbox is coming too</b> — comments and reactions on your posts, gathered

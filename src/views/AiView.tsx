@@ -1,234 +1,337 @@
 import { useState } from 'react'
-import { Callout, Pill, PlatformChip, SectionHead } from '../components/ui'
+import { useNavigate } from 'react-router-dom'
+import { aiApi, type CreateAiProviderInput, type UpdateAiProviderInput } from '../api/ai'
+import type { AiProviderDto, AiProviderType } from '../api/types'
+import { GeneratePanel, type AiDraftSeed } from '../components/GeneratePanel'
 import { Icon } from '../components/Icon'
-import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
-import type { Platform } from '../api/types'
+import {
+  Callout,
+  ConfirmModal,
+  ErrorBlock,
+  InlineError,
+  Loading,
+  Modal,
+  SectionHead,
+  Spinner,
+} from '../components/ui'
+import { useApiQuery } from '../hooks/useApiQuery'
+import { useToast } from '../hooks/useToast'
+import { describeError } from '../lib/errors'
+import { fmtDate } from '../lib/format'
 
-/**
- * STUB VIEW — the backend endpoints for AI providers (/api/ai-providers) and
- * generation (/api/ai/generate, /api/ai/chat) are designed but not implemented
- * yet. This screen previews the planned UI; every control is inert.
- */
+/* --- Add / edit modal ------------------------------------------------------ */
 
-type Tab = 'providers' | 'generate'
+function ProviderFormModal({
+  provider,
+  onClose,
+  onSaved,
+}: {
+  provider: AiProviderDto | null // null → create
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const toast = useToast()
+  const editing = provider !== null
+  const [name, setName] = useState(provider?.name ?? '')
+  const [type, setType] = useState<AiProviderType>(provider?.type ?? 'ANTHROPIC')
+  const [apiKey, setApiKey] = useState('')
+  const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? '')
+  const [defaultModel, setDefaultModel] = useState(provider?.defaultModel ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<unknown>(null)
 
-function ProvidersTab() {
-  return (
-    <>
-      <SectionHead
-        title="AI providers"
-        hint="keep several providers and switch the active one anytime"
-        actions={
-          <span className="dim">
-            <button className="btn primary" disabled>
-              <Icon name="plus" />
-              Add provider
-            </button>
-          </span>
+  const submit = async () => {
+    setError(null)
+    if (!name.trim() || (!editing && !apiKey.trim())) {
+      setError('Name and API key are required.')
+      return
+    }
+    setBusy(true)
+    try {
+      if (editing) {
+        // Absent = keep; a blank key keeps the stored one; baseUrl/defaultModel
+        // are only sent when they changed ("" clears, a value replaces).
+        const input: UpdateAiProviderInput = {
+          ...(name.trim() !== provider.name ? { name: name.trim() } : {}),
+          ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+          ...(baseUrl.trim() !== (provider.baseUrl ?? '')
+            ? { baseUrl: baseUrl.trim() }
+            : {}),
+          ...(defaultModel.trim() !== (provider.defaultModel ?? '')
+            ? { defaultModel: defaultModel.trim() }
+            : {}),
         }
-      />
+        await aiApi.update(provider.id, input)
+        toast('Provider updated')
+      } else {
+        const input: CreateAiProviderInput = {
+          name: name.trim(),
+          type,
+          apiKey: apiKey.trim(),
+          ...(baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}),
+          ...(defaultModel.trim() ? { defaultModel: defaultModel.trim() } : {}),
+        }
+        await aiApi.create(input)
+        toast('Provider added — verify the key to confirm it works')
+      }
+      onSaved()
+    } catch (e) {
+      setError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
 
-      <div className="grid cols-2">
-        {/* Example card — shows the intended design, clearly marked as sample */}
-        <div className="card pad" style={{ position: 'relative' }}>
-          <span
-            className="pill p-scheduled"
-            style={{ position: 'absolute', top: 14, right: 14 }}
-          >
-            <i />
-            example
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <span className="avatar">A</span>
-            <div>
-              <b>Anthropic main</b>
-              <div className="meta mono" style={{ color: 'var(--text-mute)', fontSize: 11 }}>
-                ANTHROPIC · api.anthropic.com
-              </div>
-            </div>
-            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-              <Pill value="PLANNED" label="active" />
-            </span>
-          </div>
-          <div className="kv">
-            <span className="k">API key</span>
-            <span className="v mono" style={{ fontSize: 11 }}>••••••••7f2a</span>
-            <span className="k">Default model</span>
-            <span className="v mono" style={{ fontSize: 11 }}>claude-sonnet-5</span>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <div className="score-line" style={{ gridTemplateColumns: '116px 1fr 54px' }}>
-              <span className="sl">Tokens used</span>
-              <span className="meter">
-                <i style={{ width: 42 }} />
-              </span>
-              <span className="sv">200.5k</span>
-            </div>
-            <p className="hint" style={{ margin: '4px 0 0' }}>
-              152.3k in · 48.2k out · 37 requests — usage is tracked automatically; “remaining credits”
-              appears only for providers that report it.
-            </p>
-          </div>
-          <div className="btn-row dim" style={{ marginTop: 12 }}>
-            <button className="btn" disabled>
-              <Icon name="refresh" />
-              Verify
-            </button>
-            <button className="btn" disabled>
-              Activate
-            </button>
-            <button className="btn danger" disabled>
-              <Icon name="trash" />
-              Remove
-            </button>
-          </div>
-        </div>
-
-        <div className="card pad">
-          <div className="eyebrow" style={{ marginBottom: 10 }}>
-            Supported provider types
-          </div>
-          <div className="kv" style={{ gridTemplateColumns: '180px 1fr' }}>
-            <span className="k">Anthropic</span>
-            <span>Claude models via Anthropic’s own API</span>
-            <span className="k">OpenAI-compatible</span>
-            <span>OpenAI, OpenRouter, Groq, Mistral, DeepSeek, local Ollama and more</span>
-          </div>
-          <div style={{ marginTop: 14 }} className="callout">
-            API keys will be stored securely and never shown in full — just like your social account
-            credentials.
-          </div>
-        </div>
-      </div>
-
-      <div style={{ height: 14 }} />
-      <Callout tone="warn">
-        <b>Not available yet.</b> This is a preview: connect several AI providers, mark one active, and
-        keep an eye on token usage.
-      </Callout>
-    </>
-  )
-}
-
-function GenerateTab() {
-  // Stub view — the platform picker below is inert, so a constant is enough.
-  const platform: Platform = 'FACEBOOK'
   return (
-    <>
-      <SectionHead title="Generate post text" hint="AI only generates text — images stay manual for now" />
-      <div className="composer-grid" style={{ gridTemplateColumns: '1fr 320px' }}>
-        <div className="card pad dim">
-          <label className="field">
-            <span className="lab">What should the post say?</span>
-            <textarea rows={4} disabled placeholder="e.g. Post about releasing v2 of our CLI tool" />
-          </label>
-          <div className="grid cols-2">
-            <label className="field">
-              <span className="lab">Tone</span>
-              <select disabled defaultValue="casual">
-                <option value="casual">casual</option>
-                <option value="professional">professional</option>
-                <option value="playful">playful</option>
-              </select>
-            </label>
-            <label className="field">
-              <span className="lab">Max length</span>
-              <input type="number" disabled defaultValue={500} />
-            </label>
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <input type="checkbox" disabled />
-            <span style={{ fontSize: 12.5 }}>Needs a title (Reddit)</span>
-          </label>
-          <div className="btn-row" style={{ marginTop: 12 }}>
-            <button className="btn primary" disabled>
-              <Icon name="ai" />
-              Generate
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="card pad dim">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>
-              Provider / model
-            </div>
-            <label className="field">
-              <span className="lab">Provider</span>
-              <select disabled defaultValue="">
-                <option value="">no providers configured yet</option>
-              </select>
-            </label>
-            <label className="field">
-              <span className="lab">Model</span>
-              <select disabled defaultValue="">
-                <option value="">provider’s default</option>
-              </select>
-            </label>
-            <div className="eyebrow" style={{ margin: '6px 0 8px' }}>
-              Platform shaping
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {PLATFORM_LIST.map((p) => (
-                <button
-                  key={p}
-                  className="btn ghost"
-                  style={{
-                    padding: '5px 10px',
-                    fontSize: 11.5,
-                    borderColor: p === platform ? 'var(--gold-line)' : undefined,
-                    color: p === platform ? 'var(--text)' : undefined,
-                  }}
-                  disabled
-                >
-                  <PlatformChip platform={p} />
-                </button>
-              ))}
-            </div>
-            <p className="hint" style={{ margin: '8px 0 0' }}>
-              Generated text is written to fit the platform — {PLATFORMS[platform].label}:{' '}
-              {PLATFORMS[platform].requiresTitle ? 'a title plus the body' : 'just the body'}, up to ~
-              {PLATFORMS[platform].maxLength.toLocaleString('en-US')} characters.
-            </p>
-          </div>
-
-          <div className="card pad">
-            <div className="eyebrow" style={{ marginBottom: 8 }}>
-              Planned flow
-            </div>
-            <p className="hint" style={{ margin: 0 }}>
-              Generate → preview → edit → send to the composer. Nothing is ever posted automatically.
-              You’ll also be able to refine a draft in a short chat: “shorter”, “add an emoji”, …
-            </p>
-          </div>
-        </div>
-      </div>
-      <div style={{ height: 14 }} />
-      <Callout tone="warn">
-        <b>Not available yet.</b> Once it’s here, you’ll draft with your chosen provider and tweak the
-        result before it ever reaches a platform.
-      </Callout>
-    </>
+    <Modal
+      title={editing ? `Edit ${provider.name}` : 'Add AI provider'}
+      sub={editing ? `provider #${provider.id}` : 'the key is stored encrypted and only ever shown partially'}
+      onClose={busy ? undefined : onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button className="btn primary" onClick={() => void submit()} disabled={busy}>
+            {busy ? <Spinner /> : editing ? 'Save' : 'Add provider'}
+          </button>
+        </>
+      }
+    >
+      <label className="field">
+        <span className="lab">Name</span>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Anthropic main"
+        />
+      </label>
+      <label className="field">
+        <span className="lab">Type</span>
+        <select
+          value={type}
+          disabled={editing}
+          onChange={(e) => setType(e.target.value as AiProviderType)}
+        >
+          <option value="ANTHROPIC">Anthropic</option>
+          <option value="OPENAI_COMPATIBLE" disabled>
+            OpenAI-compatible — coming soon
+          </option>
+        </select>
+        {editing && (
+          <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+            The provider type can’t be changed after creation.
+          </span>
+        )}
+      </label>
+      <label className="field">
+        <span className="lab">API key{editing ? ' — leave blank to keep the current one' : ''}</span>
+        <input
+          type="password"
+          value={apiKey}
+          autoComplete="off"
+          onChange={(e) => setApiKey(e.target.value)}
+          placeholder={editing ? `unchanged (${provider.apiKeyMasked})` : 'sk-ant-…'}
+        />
+      </label>
+      <label className="field">
+        <span className="lab">Base URL (optional)</span>
+        <input
+          type="url"
+          value={baseUrl}
+          onChange={(e) => setBaseUrl(e.target.value)}
+          placeholder={editing ? (provider.baseUrl ? 'https://your-anthropic-mirror' : 'official API') : 'leave empty for the official API'}
+        />
+        <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+          Point the provider at a custom endpoint implementing the Anthropic API — origin only, the
+          path is appended automatically.
+        </span>
+      </label>
+      <label className="field">
+        <span className="lab">Default model (optional)</span>
+        <input
+          type="text"
+          value={defaultModel}
+          onChange={(e) => setDefaultModel(e.target.value)}
+          placeholder="claude-sonnet-5"
+        />
+        <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+          Used when a generation request doesn’t name a model.
+        </span>
+      </label>
+      {error != null && <InlineError error={error} />}
+    </Modal>
   )
 }
+
+/* --- Main view ------------------------------------------------------------- */
 
 export default function AiView() {
-  const [tab, setTab] = useState<Tab>('providers')
+  const nav = useNavigate()
+  const toast = useToast()
+  const [tab, setTab] = useState<'providers' | 'generate'>('providers')
+  const { data, error, loading, refetch } = useApiQuery(() => aiApi.list(), ['ai-providers'])
+  const providers = data ?? []
+  const [formOpen, setFormOpen] = useState<AiProviderDto | null | 'new'>(null)
+  const [verifying, setVerifying] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState<AiProviderDto | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+
+  const verify = async (provider: AiProviderDto) => {
+    setVerifying(provider.id)
+    try {
+      const res = await aiApi.verify(provider.id)
+      if (res.ok) toast(res.message)
+      else toast({ title: 'Verification failed', detail: res.message }, 'error')
+    } catch (e) {
+      toast(describeError(e), 'error')
+    } finally {
+      setVerifying(null)
+    }
+  }
+
+  const doDelete = async () => {
+    if (!deleting) return
+    setDeleteBusy(true)
+    try {
+      await aiApi.remove(deleting.id)
+      toast('Provider deleted')
+      setDeleting(null)
+    } catch (e) {
+      toast(describeError(e), 'error')
+    } finally {
+      setDeleteBusy(false)
+      refetch()
+    }
+  }
+
   return (
     <>
-      <SectionHead
-        title="AI Assistant"
-        hint={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>planned — not available yet <Pill value="PLANNED" /></span>}
-      />
+      <SectionHead title="AI Assistant" hint="draft post text with your own AI provider" />
       <div className="tabs">
         <button className={tab === 'providers' ? 'active' : ''} onClick={() => setTab('providers')}>
-          Providers &amp; usage
+          Providers
         </button>
         <button className={tab === 'generate' ? 'active' : ''} onClick={() => setTab('generate')}>
           Generate
         </button>
       </div>
-      {tab === 'providers' ? <ProvidersTab /> : <GenerateTab />}
+
+      {tab === 'providers' ? (
+        loading && !data ? (
+          <Loading />
+        ) : error && !data ? (
+          <ErrorBlock error={error} onRetry={refetch} />
+        ) : (
+          <>
+            <SectionHead
+              title="AI providers"
+              hint="keys are stored encrypted and never shown in full"
+              actions={
+                <button className="btn primary" onClick={() => setFormOpen('new')}>
+                  <Icon name="plus" />
+                  Add provider
+                </button>
+              }
+            />
+            <div className="grid cols-2">
+              {providers.map((p) => (
+                <div className="card pad" key={p.id}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <span className="avatar">{p.name.charAt(0).toUpperCase()}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <b>{p.name}</b>
+                      <div className="meta mono" style={{ color: 'var(--text-mute)', fontSize: 11 }}>
+                        {p.type} · added {fmtDate(p.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="kv">
+                    <span className="k">API key</span>
+                    <span className="v mono" style={{ fontSize: 11 }}>
+                      {p.apiKeyMasked}
+                    </span>
+                    <span className="k">Base URL</span>
+                    <span className="v mono" style={{ fontSize: 11 }}>
+                      {p.baseUrl ?? 'official API'}
+                    </span>
+                    <span className="k">Default model</span>
+                    <span className="v mono" style={{ fontSize: 11 }}>
+                      {p.defaultModel ?? 'built-in default'}
+                    </span>
+                  </div>
+                  <div className="btn-row" style={{ marginTop: 12 }}>
+                    <button className="btn" onClick={() => void verify(p)} disabled={verifying === p.id}>
+                      {verifying === p.id ? <Spinner /> : <Icon name="refresh" />}
+                      Verify
+                    </button>
+                    <button className="btn ghost" onClick={() => setFormOpen(p)}>
+                      <Icon name="edit" />
+                      Edit
+                    </button>
+                    <button className="btn danger" onClick={() => setDeleting(p)}>
+                      <Icon name="trash" />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {!providers.length && (
+                <div className="card pad" style={{ gridColumn: '1 / -1' }}>
+                  <div className="empty">
+                    No AI providers yet. Add an Anthropic API key to start generating — the Generate
+                    tab does the rest.
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ height: 14 }} />
+            <Callout>
+              <b>What “Verify” does:</b> a cheap authenticated call against the provider (a models
+              listing) — nothing is stored. Generation works regardless; verify is just a quick way
+              to catch a mistyped key.
+            </Callout>
+          </>
+        )
+      ) : (
+        <GeneratePanel
+          mode="page"
+          providers={providers}
+          loading={loading && !data}
+          refreshProviders={refetch}
+          onGoToProviders={() => setTab('providers')}
+          onOpenInEditor={(seed: AiDraftSeed) => nav('/posts/new', { state: { aiDraft: seed } })}
+        />
+      )}
+
+      {formOpen !== null && (
+        <ProviderFormModal
+          provider={formOpen === 'new' ? null : formOpen}
+          onClose={() => setFormOpen(null)}
+          onSaved={() => {
+            setFormOpen(null)
+            refetch()
+          }}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmModal
+          title="Remove provider"
+          message={
+            <>
+              Remove <b>{deleting.name}</b>? The provider and its stored API key are deleted for
+              good — nothing references a provider yet, so this can’t break anything else.
+            </>
+          }
+          confirmLabel="Remove"
+          danger
+          busy={deleteBusy}
+          onConfirm={() => void doDelete()}
+          onClose={() => setDeleting(null)}
+        />
+      )}
     </>
   )
 }

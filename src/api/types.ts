@@ -98,3 +98,48 @@ export interface PostInput {
   content: PostContent
   overrides: Partial<Record<Platform, PostContent>>
 }
+
+/* --- AI providers & generation --- */
+
+export type AiProviderType = 'ANTHROPIC' | 'OPENAI_COMPATIBLE'
+export type GenerateEffort = 'LOW' | 'MEDIUM' | 'HIGH' | 'XHIGH' | 'MAX'
+/** GENERIC plus the publishable platforms — one generate call's variant set. */
+export type GeneratePlatform = 'GENERIC' | Platform
+
+export interface AiProviderDto {
+  id: number
+  name: string
+  type: AiProviderType
+  /** Custom API root (origin only); null = the official API. */
+  baseUrl: string | null
+  /** `••••` + last 4 — the stored key is never returned. */
+  apiKeyMasked: string
+  /** Model for generation requests that don't name one; null = built-in fallback. */
+  defaultModel: string | null
+  createdAt: string
+}
+
+export interface AiProviderVerifyResult {
+  ok: boolean
+  message: string
+}
+
+/** One drafted entry; a title only ever appears on GENERIC (optional) and REDDIT. */
+export interface GeneratedTextDto {
+  title: string | null
+  text: string
+}
+
+export interface TokenUsageDto {
+  inputTokens: number
+  outputTokens: number
+}
+
+export interface GenerateResult {
+  /** GENERIC entry; null when it wasn't requested. */
+  content: GeneratedTextDto | null
+  overrides: Partial<Record<Platform, GeneratedTextDto>>
+  provider: string
+  model: string
+  usage: TokenUsageDto
+}

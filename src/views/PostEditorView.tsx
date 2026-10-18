@@ -1,9 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { accountsApi } from '../api/accounts'
+import { aiApi } from '../api/ai'
 import { postsApi } from '../api/posts'
-import type { AccountDto, Platform, PostContent, PostDto, PostInput, PublishResult } from '../api/types'
+import type {
+  AccountDto,
+  GenerateResult,
+  Platform,
+  PostContent,
+  PostDto,
+  PostInput,
+  PublishResult,
+} from '../api/types'
+import { GeneratePanel, type AiDraftSeed, type ApplyTarget } from '../components/GeneratePanel'
 import { Icon } from '../components/Icon'
+import { PostPreview, type PreviewTab } from '../components/PostPreview'
 import {
   Callout,
   ConfirmModal,
@@ -57,6 +68,16 @@ function formFromPost(post: PostDto): FormState {
   return { title: post.content.title ?? '', text: post.content.text, link: post.content.link ?? '', ovr }
 }
 
+/** Initial form for a draft handed over from the /ai generate flow. */
+function seedForm(seed: AiDraftSeed): FormState {
+  const ovr = emptyOvr()
+  for (const p of PLATFORM_LIST) {
+    const s = seed.overrides[p]
+    if (s) ovr[p] = { on: true, title: s.title ?? '', text: s.text, link: '' }
+  }
+  return { title: seed.title, text: seed.text, link: '', ovr }
+}
+
 /** Per-field fallback exactly as the backend resolves at publish time. */
 function effectiveTitle(form: FormState, platform: Platform): string {
   const o = form.ovr[platform]
@@ -74,75 +95,6 @@ function effectiveLink(form: FormState, platform: Platform): string {
 }
 
 const looksLikeUrl = (v: string) => /^https?:\/\//.test(v)
-
-/* --- Live preview --------------------------------------------------------- */
-
-function PreviewCard({
-  form,
-  accounts,
-  platform,
-  onSelectPlatform,
-}: {
-  form: FormState
-  accounts: AccountDto[]
-  platform: Platform
-  onSelectPlatform: (p: Platform) => void
-}) {
-  const meta = PLATFORMS[platform]
-  const account = accounts.find((a) => a.platform === platform)
-  const override = form.ovr[platform].on
-  const title = effectiveTitle(form, platform)
-  const text = effectiveText(form, platform)
-  const link = effectiveLink(form, platform)
-  const len = text.length
-  const over = len > meta.maxLength
-
-  return (
-    <div className={`preview ${over ? 'over' : ''}`}>
-      <div className="ph">
-        <div className="av">{meta.label[0]}</div>
-        <div>
-          <div className="pn">{account?.displayName ?? meta.label}</div>
-          <div className="pt">{meta.label} · preview - beta</div>
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          {PLATFORM_LIST.map((p) => (
-            <button
-              key={p}
-              className="btn ghost"
-              style={{ padding: '4px 9px', fontSize: 11, opacity: p === platform ? 1 : 0.5 }}
-              onClick={() => onSelectPlatform(p)}
-              disabled={p === platform}
-            >
-              {PLATFORMS[p].label[0]}
-            </button>
-          ))}
-        </div>
-      </div>
-      {platform === 'REDDIT' && title.trim() && (
-        <div className="pbody" style={{ fontWeight: 600, marginBottom: 6 }}>
-          {title}
-        </div>
-      )}
-      <div className="pbody">
-        {text || <span style={{ color: 'var(--text-mute)' }}>Nothing yet — start typing the generic text.</span>}
-      </div>
-      {link && (
-        <div className="meta mono" style={{ marginTop: 8, overflowWrap: 'anywhere' }}>
-          🔗{' '}
-          <a href={link} target="_blank" rel="noreferrer">
-            {link}
-          </a>
-        </div>
-      )}
-      <div className="pcount">
-        {len.toLocaleString('en-US')} / ~{meta.maxLength.toLocaleString('en-US')} chars
-        {over && ` — ${len - meta.maxLength} over (soft limit, not enforced)`}
-        {override ? ' · platform override' : ' · generic text'}
-      </div>
-    </div>
-  )
-}
 
 /* --- Publish confirm / results modal -------------------------------------- */
 
@@ -423,6 +375,9 @@ function ManualPublishDialog({
 export default function PostEditorView() {
   const { id } = useParams()
   const postId = id ? Number(id) : null
+  // The /ai generate flow hands a drafted variant set over via router state.
+  const location = useLocation()
+  const seed = (location.state as { aiDraft?: AiDraftSeed } | null)?.aiDraft
 
   const postQuery = useApiQuery<PostDto | null>(
     () => (postId ? postsApi.get(postId) : Promise.resolve(null)),
@@ -445,6 +400,7 @@ export default function PostEditorView() {
       post={postQuery.data}
       accounts={accountsQuery.data}
       refresh={postQuery.refetch}
+      seed={seed}
     />
   )
 }
@@ -455,12 +411,15 @@ function Editor({
   post,
   accounts,
   refresh,
+  seed,
 }: {
   post: PostDto | null
   accounts: AccountDto[]
   refresh: () => void
+  seed?: AiDraftSeed
 }) {
   const nav = useNavigate()
+  const location = useLocation()
   const toast = useToast()
 
   // On /posts/new a created draft lives here until the URL catches up, so the
@@ -470,10 +429,14 @@ function Editor({
   const postId = current?.id ?? null
   const readOnly = current?.status === 'PUBLISHED'
 
-  const [form, setForm] = useState<FormState>(() => (post ? formFromPost(post) : EMPTY_FORM))
-  const [baseline, setBaseline] = useState<string>(() => JSON.stringify(post ? formFromPost(post) : EMPTY_FORM))
+  const [form, setForm] = useState<FormState>(() =>
+    post ? formFromPost(post) : seed ? seedForm(seed) : EMPTY_FORM,
+  )
+  const [baseline, setBaseline] = useState<string>(() =>
+    JSON.stringify(post ? formFromPost(post) : seed ? seedForm(seed) : EMPTY_FORM),
+  )
   const [tab, setTab] = useState<Tab>('GENERIC')
-  const [previewPlatform, setPreviewPlatform] = useState<Platform>('FACEBOOK')
+  const [previewPlatform, setPreviewPlatform] = useState<PreviewTab>('FACEBOOK')
   const [targets, setTargets] = useState<number[]>(() =>
     accounts.filter((a) => a.status === 'ACTIVE' && a.canPublish).map((a) => a.id),
   )
@@ -497,8 +460,18 @@ function Editor({
   const [shareBusy, setShareBusy] = useState<number | null>(null)
   /** "Delete publications" — the backend rejects true (501) until platform-side deletion ships. */
   const [deletePublications, setDeletePublications] = useState(false)
+  // AI assist: provider list (also feeds the generate modal) + modal open flag.
+  const providersQuery = useApiQuery(() => aiApi.list(), ['ai-providers'])
+  const providers = providersQuery.data ?? []
+  const [aiOpen, setAiOpen] = useState(false)
 
   const dirty = !readOnly && JSON.stringify(form) !== baseline
+
+  // Consume the /ai handoff: replace the history entry so navigating back to
+  // it (or refreshing after a failed autosave) can't re-seed a new draft.
+  useEffect(() => {
+    if (seed) nav(location.pathname, { replace: true })
+  }, [seed, nav, location.pathname])
 
   // Warn before losing an edited draft when the tab/app closes.
   useEffect(() => {
@@ -707,6 +680,35 @@ function Editor({
     } finally {
       setShareBusy(null)
     }
+  }
+
+  /**
+   * Apply a generation result into the form: 'all' takes everything, otherwise
+   * just the generic content or one platform variant. Generated overrides carry
+   * no link — the form's existing link values stay untouched.
+   */
+  const applyGenerated = (r: GenerateResult, which: ApplyTarget) => {
+    const generic = which === 'all' || which === 'GENERIC'
+    setForm((f) => {
+      const ovr = { ...f.ovr }
+      for (const p of PLATFORM_LIST) {
+        const g = which === 'all' || which === p ? r.overrides[p] : undefined
+        if (g) ovr[p] = { on: true, title: g.title ?? '', text: g.text, link: f.ovr[p].link }
+      }
+      return {
+        ...f,
+        ...(generic && r.content?.title ? { title: r.content.title } : {}),
+        ...(generic && r.content?.text ? { text: r.content.text } : {}),
+        ovr,
+      }
+    })
+    setAiOpen(false)
+    toast(
+      which === 'all'
+        ? 'AI text applied to the draft'
+        : `AI ${which === 'GENERIC' ? 'generic text' : `${PLATFORMS[which].label} variant`} applied`,
+    )
+    if (which !== 'all' && which !== 'GENERIC') setTab(which)
   }
 
   const toggleTarget = (accountId: number) => {
@@ -927,11 +929,20 @@ function Editor({
             </div>
           </div>
 
-          <PreviewCard
-            form={form}
+          <PostPreview
+            tab={previewPlatform}
+            contentFor={(p) =>
+              p === 'GENERIC'
+                ? { title: form.title, text: form.text, link: form.link }
+                : {
+                    title: effectiveTitle(form, p),
+                    text: effectiveText(form, p),
+                    link: effectiveLink(form, p),
+                  }
+            }
             accounts={accounts}
-            platform={previewPlatform}
-            onSelectPlatform={setPreviewPlatform}
+            note={(p) => (p !== 'GENERIC' && form.ovr[p].on ? ' · platform override' : ' · generic text')}
+            onSelectTab={setPreviewPlatform}
           />
         </div>
 
@@ -1030,19 +1041,53 @@ function Editor({
             </div>
           )}
 
-          <div className="card pad">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>
-              AI assist
+          {!readOnly && (
+            <div className="card pad">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>
+                AI assist
+              </div>
+              {providersQuery.error != null && providersQuery.data === undefined ? (
+                <p className="hint" style={{ margin: 0 }}>
+                  Couldn’t load AI providers.{' '}
+                  <button
+                    className="btn ghost"
+                    style={{ padding: '2px 8px', fontSize: 11 }}
+                    onClick={providersQuery.refetch}
+                  >
+                    Retry
+                  </button>
+                </p>
+              ) : providersQuery.data === undefined ? (
+                <p className="hint" style={{ margin: 0 }}>
+                  Checking AI providers…
+                </p>
+              ) : providers.length === 0 ? (
+                <p className="hint" style={{ margin: 0 }}>
+                  No AI provider configured. <Link to="/ai">Add one →</Link>
+                </p>
+              ) : (
+                <>
+                  <button
+                    className="btn"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    onClick={() => setAiOpen(true)}
+                  >
+                    <Icon name="ai" /> Generate text with AI
+                  </button>
+                  <p className="hint" style={{ margin: '8px 0 0' }}>
+                    {providers.length === 1 ? (
+                      <>
+                        uses <b>{providers[0].name}</b> — manage providers on the{' '}
+                        <Link to="/ai">AI page</Link>
+                      </>
+                    ) : (
+                      `${providers.length} providers — pick one when generating`
+                    )}
+                  </p>
+                </>
+              )}
             </div>
-            <div className="dim">
-              <button className="btn" style={{ width: '100%', justifyContent: 'center' }} disabled>
-                <Icon name="ai" /> Generate text with AI
-              </button>
-            </div>
-            <p className="hint" style={{ margin: '8px 0 0' }}>
-              AI text generation is on the roadmap. <Link to="/ai">See what’s coming →</Link>
-            </p>
-          </div>
+          )}
 
         </div>
       </div>
@@ -1097,6 +1142,18 @@ function Editor({
             )}
           </div>
         </>
+      )}
+
+      {aiOpen && !readOnly && (
+        <GeneratePanel
+          mode="modal"
+          providers={providers}
+          loading={providersQuery.data === undefined && providersQuery.loading}
+          refreshProviders={providersQuery.refetch}
+          initialPrompt={form.text}
+          onClose={() => setAiOpen(false)}
+          onApply={applyGenerated}
+        />
       )}
 
       {manualOpen && (

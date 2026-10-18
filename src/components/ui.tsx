@@ -206,12 +206,15 @@ export function Modal({
   title,
   sub,
   onClose,
+  wide,
   children,
   footer,
 }: {
   title: string
   sub?: string
   onClose?: () => void
+  /** Wider dialog for content that needs the room (e.g. AI result previews). */
+  wide?: boolean
   children: ReactNode
   footer?: ReactNode
 }) {
@@ -229,7 +232,7 @@ export function Modal({
         if (e.target === e.currentTarget && onClose) onClose()
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <header>
           <div>
             <h3>{title}</h3>
