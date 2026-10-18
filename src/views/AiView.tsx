@@ -25,6 +25,12 @@ const AI_TYPE_LABELS: Record<AiProviderType, string> = {
   OPENAI_COMPATIBLE: 'OpenAI-compatible',
 }
 
+/**
+ * Placeholder that satisfies creation's required defaultModel until the user
+ * picks a real one from the auto-opened edit dialog's models listing.
+ */
+const PLACEHOLDER_MODEL = 'not-chosen'
+
 /* --- Add / edit modal ------------------------------------------------------ */
 
 function ProviderFormModal({
@@ -34,7 +40,12 @@ function ProviderFormModal({
 }: {
   provider: AiProviderDto | null // null → create
   onClose: () => void
-  onSaved: () => void
+  /**
+   * Called after a successful save. Carries the created provider when its
+   * defaultModel was a placeholder — the parent then reopens the dialog in
+   * edit mode so the real default gets picked from the models listing.
+   */
+  onSaved: (created?: AiProviderDto) => void
 }) {
   const toast = useToast()
   const editing = provider !== null
@@ -42,7 +53,11 @@ function ProviderFormModal({
   const [type, setType] = useState<AiProviderType>(provider?.type ?? 'ANTHROPIC')
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState(provider?.baseUrl ?? '')
-  const [defaultModel, setDefaultModel] = useState(provider?.defaultModel ?? '')
+  // Still on the creation placeholder → start empty so the models dropdown
+  // (not an input pre-filled with "nomodel") is what greets the user.
+  const [defaultModel, setDefaultModel] = useState(
+    provider?.defaultModel === PLACEHOLDER_MODEL ? '' : provider?.defaultModel ?? '',
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
@@ -64,12 +79,18 @@ function ProviderFormModal({
 
   const submit = async () => {
     setError(null)
-    if (!name.trim() || (!editing && !apiKey.trim()) || !defaultModel.trim()) {
-      setError('Name, API key and default model are required.')
+    if (!name.trim() || (!editing && !apiKey.trim())) {
+      setError('Name and API key are required.')
+      return
+    }
+    // Backend rule: defaultModel can be replaced but never cleared.
+    if (editing && !defaultModel.trim()) {
+      setError('Pick a default model — it can only be replaced, never cleared.')
       return
     }
     setBusy(true)
     try {
+      let reopen: AiProviderDto | undefined
       if (editing) {
         // Absent = keep; a blank key keeps the stored one; baseUrl/defaultModel
         // are only sent when they changed (baseUrl "" clears; defaultModel can
@@ -87,17 +108,25 @@ function ProviderFormModal({
         await aiApi.update(provider.id, input)
         toast('Provider updated')
       } else {
+        const placeholderModel = !defaultModel.trim()
         const input: CreateAiProviderInput = {
           name: name.trim(),
           type,
           apiKey: apiKey.trim(),
-          defaultModel: defaultModel.trim(),
+          // Required backend-side — a placeholder passes creation; the
+          // auto-opened edit step replaces it with the picked model.
+          defaultModel: defaultModel.trim() || PLACEHOLDER_MODEL,
           ...(baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}),
         }
-        await aiApi.create(input)
-        toast('Provider added — verify the key, then Edit to pick the default model from its list')
+        const created = await aiApi.create(input)
+        if (placeholderModel) reopen = created
+        toast(
+          placeholderModel
+            ? 'Provider added — now pick its default model from the list'
+            : 'Provider added — verify the key to confirm it works',
+        )
       }
-      onSaved()
+      onSaved(reopen)
     } catch (e) {
       setError(e)
     } finally {
@@ -173,6 +202,7 @@ function ProviderFormModal({
               onChange={setDefaultModel}
               suggestions={modelSuggestions}
               placeholder="model id"
+              emptyLabel="pick a model…"
             />
             {modelsQuery.error != null && (
               <span className="hint" style={{ display: 'block', marginTop: 4 }}>
@@ -189,8 +219,7 @@ function ProviderFormModal({
               placeholder="e.g. claude-sonnet-5"
             />
             <span className="hint" style={{ display: 'block', marginTop: 4 }}>
-              Any placeholder works right now — after adding, <b>Edit</b> the provider to pick the
-              real default from the models its key can use.
+              Leave blank to choose from available models on the next step.
             </span>
           </>
         )}
@@ -357,10 +386,15 @@ export default function AiView() {
 
       {formOpen !== null && (
         <ProviderFormModal
+          // The key forces a remount when the dialog reopens for a just-created
+          // provider (new → edit) so the form state re-initializes from it.
+          key={formOpen === 'new' ? 'new' : formOpen.id}
           provider={formOpen === 'new' ? null : formOpen}
           onClose={() => setFormOpen(null)}
-          onSaved={() => {
-            setFormOpen(null)
+          onSaved={(created) => {
+            // Placeholder-defaultModel flow: hand the dialog over to the new
+            // provider so the models listing can be picked from right away.
+            setFormOpen(created ?? null)
             refetch()
           }}
         />

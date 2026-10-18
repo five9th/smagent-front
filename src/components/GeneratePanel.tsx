@@ -281,7 +281,7 @@ export function GeneratePanel({
 
   const promptField = (
     <label className="field">
-      <span className="lab">What should the post say?</span>
+      <span className="lab">What should the post say? (prompt)</span>
       <textarea
         rows={4}
         value={prompt}
