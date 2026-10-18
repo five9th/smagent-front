@@ -764,7 +764,7 @@ function Editor({
       {!readOnly && (
         <div className="tabs" style={{ marginBottom: 14 }}>
           <button className={page === 'edit' ? 'active' : ''} onClick={() => setPage('edit')}>
-            Edit
+            Editor
           </button>
           <button
             className={page === 'ai' ? 'active' : ''}
@@ -773,7 +773,7 @@ function Editor({
               setAiVisited(true)
             }}
           >
-            AI
+            AI Generation
           </button>
         </div>
       )}
