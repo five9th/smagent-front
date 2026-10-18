@@ -9,7 +9,9 @@ import type {
   GenerateResult,
   GeneratedTextDto,
   Platform,
+  PostContent,
 } from '../api/types'
+import { useApiQuery } from '../hooks/useApiQuery'
 import {
   rememberModel,
   rememberProviderId,
@@ -19,6 +21,7 @@ import {
 import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
 import { Icon } from './Icon'
 import { PostPreview, type PreviewTab } from './PostPreview'
+import { ValuePicker, type Suggestion } from './ValuePicker'
 import {
   Callout,
   CopyButton,
@@ -107,6 +110,7 @@ export function GeneratePanel({
   loading,
   refreshProviders,
   initialPrompt = '',
+  draft = null,
   onClose,
   onApply,
   onOpenInEditor,
@@ -118,6 +122,12 @@ export function GeneratePanel({
   refreshProviders: () => void
   /** Editor mode: seed the prompt with the current generic text. */
   initialPrompt?: string
+  /**
+   * Editor mode: current draft content (null when there's nothing to show) —
+   * with the user's consent it rides along so the AI edits instead of
+   * drafting from scratch.
+   */
+  draft?: Partial<Record<GeneratePlatform, PostContent>> | null
   onClose?: () => void
   onApply?: (result: GenerateResult, which: ApplyTarget) => void
   onOpenInEditor?: (seed: AiDraftSeed) => void
@@ -130,6 +140,7 @@ export function GeneratePanel({
   const [platforms, setPlatforms] = useState<Set<GeneratePlatform>>(() => new Set(['GENERIC']))
   const [chosenId, setChosenId] = useState<number | ''>(() => rememberedProviderId() ?? '')
   const [model, setModel] = useState(rememberedModel)
+  const [showDraft, setShowDraft] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [result, setResult] = useState<GenerateResult | null>(null)
@@ -142,6 +153,19 @@ export function GeneratePanel({
 
   const selected =
     providers.length === 1 ? providers[0] : providers.find((p) => p.id === providerId)
+
+  // Suggestion lists for the pickers: the selected provider's live models and
+  // the effort enum. Both degrade gracefully when unreachable.
+  const modelsQuery = useApiQuery(
+    () => (selected ? aiApi.models(selected.id) : Promise.resolve([] as string[])),
+    ['ai-models', selected?.id ?? null],
+  )
+  const modelSuggestions: Suggestion[] = (modelsQuery.data ?? []).map((m) => ({
+    value: m,
+    label: m,
+  }))
+  const effortQuery = useApiQuery(() => aiApi.effortLevels(), ['ai-effort-levels'])
+  const effortLevels = effortQuery.data ?? EFFORTS
 
   if (loading) {
     return mode === 'modal' ? (
@@ -206,6 +230,7 @@ export function GeneratePanel({
               },
             }
           : {}),
+        ...(showDraft && draft ? { editorState: draft } : {}),
         // Exactly one provider: let the backend infer it.
         ...(multiple && providerId !== '' ? { providerId } : {}),
         ...(model.trim() ? { model: model.trim() } : {}),
@@ -228,6 +253,31 @@ export function GeneratePanel({
   }
 
   /* --- Field chunks, composed differently per mode ------------------------- */
+
+  // Top of the dialog: consent to sharing the current draft with the AI.
+  // Only offered when there is something to show (editor mode with content).
+  const draftToggle = draft != null && (
+    <label
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 9,
+        marginBottom: 12,
+        cursor: 'pointer',
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={showDraft}
+        disabled={busy}
+        onChange={(e) => setShowDraft(e.target.checked)}
+      />
+      <span style={{ fontSize: 12.5 }}>
+        <b>Show draft to AI</b> — the model refines the text already in the editor instead of
+        writing from scratch
+      </span>
+    </label>
+  )
 
   const promptField = (
     <label className="field">
@@ -300,33 +350,47 @@ export function GeneratePanel({
   const modelField = (
     <label className="field">
       <span className="lab">Model (optional)</span>
-      <input
-        type="text"
+      <ValuePicker
         value={model}
-        onChange={(e) => {
-          setModel(e.target.value)
-          rememberModel(e.target.value)
+        onChange={(v) => {
+          setModel(v)
+          rememberModel(v)
         }}
-        placeholder={selected?.defaultModel ?? 'claude-sonnet-5'}
+        suggestions={modelSuggestions}
+        placeholder={selected?.defaultModel ?? 'type a model id'}
+        emptyLabel={
+          selected?.defaultModel ? `provider default (${selected.defaultModel})` : 'provider default'
+        }
       />
       <span className="hint" style={{ display: 'block', marginTop: 4 }}>
-        Free text — providers can’t list their models yet. Empty uses the provider’s default.
+        {modelsQuery.error
+          ? 'Couldn’t list this provider’s models — type the id manually.'
+          : 'From the provider’s model list, or custom. Empty uses the provider’s default.'}
       </span>
     </label>
   )
 
+  // Effort is an Anthropic-only knob for now — kept visible but inert for
+  // OpenAI-compatible providers so the field doesn't silently appear/disappear.
+  const effortInert = selected?.type === 'OPENAI_COMPATIBLE'
   const effortField = (
     <label className="field">
       <span className="lab">Reasoning effort</span>
-      <select value={effort} onChange={(e) => setEffort(e.target.value as GenerateEffort)}>
-        {EFFORTS.map((lvl) => (
+      <select
+        value={effort}
+        disabled={effortInert}
+        onChange={(e) => setEffort(e.target.value as GenerateEffort)}
+      >
+        {effortLevels.map((lvl) => (
           <option key={lvl} value={lvl}>
-            {EFFORT_LABELS[lvl]}
+            {EFFORT_LABELS[lvl] ?? lvl}
           </option>
         ))}
       </select>
       <span className="hint" style={{ display: 'block', marginTop: 4 }}>
-        How hard the model thinks it over — higher is slower and more thorough.
+        {effortInert
+          ? 'Anthropic-only for now — not sent to OpenAI-compatible providers.'
+          : 'How hard the model thinks it over — higher is slower and more thorough.'}
       </span>
     </label>
   )
@@ -437,6 +501,7 @@ export function GeneratePanel({
         sub="the result lands in your draft — nothing is posted automatically"
         onClose={busy ? undefined : onClose}
       >
+        {draftToggle}
         {promptField}
         {constraintsRow}
         {providerField}

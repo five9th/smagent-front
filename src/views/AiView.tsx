@@ -4,6 +4,7 @@ import { aiApi, type CreateAiProviderInput, type UpdateAiProviderInput } from '.
 import type { AiProviderDto, AiProviderType } from '../api/types'
 import { GeneratePanel, type AiDraftSeed } from '../components/GeneratePanel'
 import { Icon } from '../components/Icon'
+import { ValuePicker, type Suggestion } from '../components/ValuePicker'
 import {
   Callout,
   ConfirmModal,
@@ -18,6 +19,11 @@ import { useApiQuery } from '../hooks/useApiQuery'
 import { useToast } from '../hooks/useToast'
 import { describeError } from '../lib/errors'
 import { fmtDate } from '../lib/format'
+
+const AI_TYPE_LABELS: Record<AiProviderType, string> = {
+  ANTHROPIC: 'Anthropic',
+  OPENAI_COMPATIBLE: 'OpenAI-compatible',
+}
 
 /* --- Add / edit modal ------------------------------------------------------ */
 
@@ -40,17 +46,34 @@ function ProviderFormModal({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
+  // Suggestion lists for the pickers: well-known API roots for the chosen
+  // type, and (when editing) the provider's live model ids — the two-step
+  // defaultModel flow: create with a placeholder, then Edit and pick.
+  const baseUrlsQuery = useApiQuery(() => aiApi.baseUrls(type), ['ai-baseurls', type])
+  const baseUrlSuggestions: Suggestion[] = Object.entries(baseUrlsQuery.data ?? {}).map(
+    ([label, url]) => ({ value: url, label: `${label} (${url})` }),
+  )
+  const modelsQuery = useApiQuery(
+    () => (editing ? aiApi.models(provider.id) : Promise.resolve([] as string[])),
+    ['ai-models', editing ? provider.id : null],
+  )
+  const modelSuggestions: Suggestion[] = (modelsQuery.data ?? []).map((m) => ({
+    value: m,
+    label: m,
+  }))
+
   const submit = async () => {
     setError(null)
-    if (!name.trim() || (!editing && !apiKey.trim())) {
-      setError('Name and API key are required.')
+    if (!name.trim() || (!editing && !apiKey.trim()) || !defaultModel.trim()) {
+      setError('Name, API key and default model are required.')
       return
     }
     setBusy(true)
     try {
       if (editing) {
         // Absent = keep; a blank key keeps the stored one; baseUrl/defaultModel
-        // are only sent when they changed ("" clears, a value replaces).
+        // are only sent when they changed (baseUrl "" clears; defaultModel can
+        // only be replaced — the required check above keeps it non-blank).
         const input: UpdateAiProviderInput = {
           ...(name.trim() !== provider.name ? { name: name.trim() } : {}),
           ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
@@ -68,11 +91,11 @@ function ProviderFormModal({
           name: name.trim(),
           type,
           apiKey: apiKey.trim(),
+          defaultModel: defaultModel.trim(),
           ...(baseUrl.trim() ? { baseUrl: baseUrl.trim() } : {}),
-          ...(defaultModel.trim() ? { defaultModel: defaultModel.trim() } : {}),
         }
         await aiApi.create(input)
-        toast('Provider added — verify the key to confirm it works')
+        toast('Provider added — verify the key, then Edit to pick the default model from its list')
       }
       onSaved()
     } catch (e) {
@@ -112,12 +135,18 @@ function ProviderFormModal({
         <select
           value={type}
           disabled={editing}
-          onChange={(e) => setType(e.target.value as AiProviderType)}
+          onChange={(e) => {
+            const next = e.target.value as AiProviderType
+            setType(next)
+            // The URL convention differs per type — don't carry a value over.
+            if (!editing) setBaseUrl('')
+          }}
         >
-          <option value="ANTHROPIC">Anthropic</option>
-          <option value="OPENAI_COMPATIBLE" disabled>
-            OpenAI-compatible — coming soon
-          </option>
+          {(Object.keys(AI_TYPE_LABELS) as AiProviderType[]).map((t) => (
+            <option key={t} value={t}>
+              {AI_TYPE_LABELS[t]}
+            </option>
+          ))}
         </select>
         {editing && (
           <span className="hint" style={{ display: 'block', marginTop: 4 }}>
@@ -132,32 +161,53 @@ function ProviderFormModal({
           value={apiKey}
           autoComplete="off"
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder={editing ? `unchanged (${provider.apiKeyMasked})` : 'sk-ant-…'}
+          placeholder={editing ? `unchanged (${provider.apiKeyMasked})` : 'sk-ant-… / sk-or-…'}
         />
+      </label>
+      <label className="field">
+        <span className="lab">Default model — used when a request doesn’t name one</span>
+        {editing ? (
+          <>
+            <ValuePicker
+              value={defaultModel}
+              onChange={setDefaultModel}
+              suggestions={modelSuggestions}
+              placeholder="model id"
+            />
+            {modelsQuery.error != null && (
+              <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+                Couldn’t list this provider’s models — type the id manually.
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <input
+              type="text"
+              value={defaultModel}
+              onChange={(e) => setDefaultModel(e.target.value)}
+              placeholder="e.g. claude-sonnet-5"
+            />
+            <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+              Any placeholder works right now — after adding, <b>Edit</b> the provider to pick the
+              real default from the models its key can use.
+            </span>
+          </>
+        )}
       </label>
       <label className="field">
         <span className="lab">Base URL (optional)</span>
-        <input
-          type="url"
+        <ValuePicker
           value={baseUrl}
-          onChange={(e) => setBaseUrl(e.target.value)}
-          placeholder={editing ? (provider.baseUrl ? 'https://your-anthropic-mirror' : 'official API') : 'leave empty for the official API'}
+          onChange={setBaseUrl}
+          suggestions={baseUrlSuggestions}
+          placeholder={type === 'ANTHROPIC' ? 'https://your-anthropic-mirror' : 'https://host/v1'}
+          emptyLabel="the type’s default endpoint"
         />
         <span className="hint" style={{ display: 'block', marginTop: 4 }}>
-          Point the provider at a custom endpoint implementing the Anthropic API — origin only, the
-          path is appended automatically.
-        </span>
-      </label>
-      <label className="field">
-        <span className="lab">Default model (optional)</span>
-        <input
-          type="text"
-          value={defaultModel}
-          onChange={(e) => setDefaultModel(e.target.value)}
-          placeholder="claude-sonnet-5"
-        />
-        <span className="hint" style={{ display: 'block', marginTop: 4 }}>
-          Used when a generation request doesn’t name a model.
+          {type === 'ANTHROPIC'
+            ? 'Origin only — the /v1/… path is appended automatically.'
+            : 'Full API root including the version path, e.g. https://api.openai.com/v1.'}
         </span>
       </label>
       {error != null && <InlineError error={error} />}
@@ -243,7 +293,7 @@ export default function AiView() {
                     <div style={{ minWidth: 0 }}>
                       <b>{p.name}</b>
                       <div className="meta mono" style={{ color: 'var(--text-mute)', fontSize: 11 }}>
-                        {p.type} · added {fmtDate(p.createdAt)}
+                        {AI_TYPE_LABELS[p.type]} · added {fmtDate(p.createdAt)}
                       </div>
                     </div>
                   </div>
@@ -258,7 +308,7 @@ export default function AiView() {
                     </span>
                     <span className="k">Default model</span>
                     <span className="v mono" style={{ fontSize: 11 }}>
-                      {p.defaultModel ?? 'built-in default'}
+                      {p.defaultModel ?? 'not set'}
                     </span>
                   </div>
                   <div className="btn-row" style={{ marginTop: 12 }}>

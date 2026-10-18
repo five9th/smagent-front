@@ -114,7 +114,7 @@ export interface AiProviderDto {
   baseUrl: string | null
   /** `••••` + last 4 — the stored key is never returned. */
   apiKeyMasked: string
-  /** Model for generation requests that don't name one; null = built-in fallback. */
+  /** Model for generation requests that don't name one; required (null only on pre-requirement rows). */
   defaultModel: string | null
   createdAt: string
 }

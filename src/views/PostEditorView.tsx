@@ -5,6 +5,7 @@ import { aiApi } from '../api/ai'
 import { postsApi } from '../api/posts'
 import type {
   AccountDto,
+  GeneratePlatform,
   GenerateResult,
   Platform,
   PostContent,
@@ -76,6 +77,29 @@ function seedForm(seed: AiDraftSeed): FormState {
     if (s) ovr[p] = { on: true, title: s.title ?? '', text: s.text, link: '' }
   }
   return { title: seed.title, text: seed.text, link: '', ovr }
+}
+
+/**
+ * Current content the AI may read (with consent) in the generate modal:
+ * GENERIC plus every enabled override. Entries with blank text are dropped
+ * (the backend ignores them anyway); null when there's nothing to show.
+ */
+function aiDraftFromForm(form: FormState): Partial<Record<GeneratePlatform, PostContent>> | null {
+  const state: Partial<Record<GeneratePlatform, PostContent>> = {}
+  if (form.text.trim()) {
+    state.GENERIC = {
+      title: form.title.trim() || null,
+      text: form.text,
+      link: form.link.trim() || null,
+    }
+  }
+  for (const p of PLATFORM_LIST) {
+    const o = form.ovr[p]
+    if (o.on && o.text.trim()) {
+      state[p] = { title: o.title.trim() || null, text: o.text, link: o.link.trim() || null }
+    }
+  }
+  return Object.keys(state).length ? state : null
 }
 
 /** Per-field fallback exactly as the backend resolves at publish time. */
@@ -1151,6 +1175,7 @@ function Editor({
           loading={providersQuery.data === undefined && providersQuery.loading}
           refreshProviders={providersQuery.refetch}
           initialPrompt={form.text}
+          draft={aiDraftFromForm(form)}
           onClose={() => setAiOpen(false)}
           onApply={applyGenerated}
         />
