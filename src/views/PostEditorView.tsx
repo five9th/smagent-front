@@ -1174,7 +1174,6 @@ function Editor({
           providers={providers}
           loading={providersQuery.data === undefined && providersQuery.loading}
           refreshProviders={providersQuery.refetch}
-          initialPrompt={form.text}
           draft={aiDraftFromForm(form)}
           onClose={() => setAiOpen(false)}
           onApply={applyGenerated}

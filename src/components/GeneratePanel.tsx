@@ -120,7 +120,7 @@ export function GeneratePanel({
   providers: AiProviderDto[]
   loading: boolean
   refreshProviders: () => void
-  /** Editor mode: seed the prompt with the current generic text. */
+  /** Optional text to seed the prompt field with. */
   initialPrompt?: string
   /**
    * Editor mode: current draft content (null when there's nothing to show) —
