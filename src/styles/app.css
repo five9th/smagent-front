@@ -172,6 +172,9 @@ input:disabled, textarea:disabled, select:disabled { opacity: .5; cursor: not-al
 textarea { resize: vertical; min-height: 76px; line-height: 1.55; }
 input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gold-line); }
 input[type=checkbox] { accent-color: var(--gold); width: 15px; height: 15px; flex: none; }
+input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .hint { font-size: 11px; color: var(--text-mute); }
 
 .meter { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
