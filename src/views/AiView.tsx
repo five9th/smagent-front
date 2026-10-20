@@ -352,10 +352,19 @@ function SettingsTab() {
 
 /* --- Main view ------------------------------------------------------------- */
 
+type Tab = 'providers' | 'generate' | 'settings'
+
 export default function AiView() {
   const nav = useNavigate()
   const toast = useToast()
-  const [tab, setTab] = useState<'providers' | 'generate' | 'settings'>('providers')
+  const [tab, setTab] = useState<Tab>('providers')
+  // Tabs mount lazily on first visit and then stay mounted (hidden), so
+  // switching never loses the Generate/Settings form state.
+  const [visited, setVisited] = useState<Set<Tab>>(() => new Set(['providers']))
+  const showTab = (t: Tab) => {
+    setTab(t)
+    setVisited((v) => (v.has(t) ? v : new Set(v).add(t)))
+  }
   const { data, error, loading, refetch } = useApiQuery(() => aiApi.list(), ['ai-providers'])
   const providers = data ?? []
   const [formOpen, setFormOpen] = useState<AiProviderDto | null | 'new'>(null)
@@ -395,19 +404,19 @@ export default function AiView() {
     <>
       <SectionHead title="AI Assistant" hint="draft post text with your own AI provider" />
       <div className="tabs">
-        <button className={tab === 'providers' ? 'active' : ''} onClick={() => setTab('providers')}>
+        <button className={tab === 'providers' ? 'active' : ''} onClick={() => showTab('providers')}>
           Providers
         </button>
-        <button className={tab === 'generate' ? 'active' : ''} onClick={() => setTab('generate')}>
+        <button className={tab === 'generate' ? 'active' : ''} onClick={() => showTab('generate')}>
           Generate
         </button>
-        <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
+        <button className={tab === 'settings' ? 'active' : ''} onClick={() => showTab('settings')}>
           Settings
         </button>
       </div>
 
-      {tab === 'providers' ? (
-        loading && !data ? (
+      <div style={{ display: tab === 'providers' ? undefined : 'none' }}>
+        {loading && !data ? (
           <Loading />
         ) : error && !data ? (
           <ErrorBlock error={error} onRetry={refetch} />
@@ -481,17 +490,25 @@ export default function AiView() {
               to catch a mistyped key.
             </Callout>
           </>
-        )
-      ) : tab === 'generate' ? (
-        <GeneratePanel
-          providers={providers}
-          loading={loading && !data}
-          refreshProviders={refetch}
-          onGoToProviders={() => setTab('providers')}
-          onOpenInEditor={(seed: AiDraftSeed) => nav('/posts/new', { state: { aiDraft: seed } })}
-        />
-      ) : (
-        <SettingsTab />
+        )}
+      </div>
+
+      {visited.has('generate') && (
+        <div style={{ display: tab === 'generate' ? undefined : 'none' }}>
+          <GeneratePanel
+            providers={providers}
+            loading={loading && !data}
+            refreshProviders={refetch}
+            onGoToProviders={() => setTab('providers')}
+            onOpenInEditor={(seed: AiDraftSeed) => nav('/posts/new', { state: { aiDraft: seed } })}
+          />
+        </div>
+      )}
+
+      {visited.has('settings') && (
+        <div style={{ display: tab === 'settings' ? undefined : 'none' }}>
+          <SettingsTab />
+        </div>
       )}
 
       {formOpen !== null && (
