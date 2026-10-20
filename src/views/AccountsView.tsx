@@ -127,7 +127,7 @@ function AccountFormModal({
         const input: AccountInput = {
           platform,
           authMethod,
-          credentials: Object.fromEntries(fields.map((f) => [f.key, creds[f.key].trim()])),
+          credentials: Object.fromEntries(fields.map((f) => [f.key, (creds[f.key] ?? '').trim()])),
           ...(displayName.trim() ? { displayName: displayName.trim() } : {}),
         }
         await accountsApi.create(input)
@@ -219,7 +219,11 @@ function AccountFormModal({
         <label className="field" key={f.key}>
           <span className="lab">
             {f.label}
-            {!editing && <span style={{ color: 'var(--text-mute)' }}> — required</span>}
+            {!editing && (
+              <span style={{ color: 'var(--text-mute)' }}>
+                {f.optional ? ' — optional' : ' — required'}
+              </span>
+            )}
           </span>
           <input
             type={f.secret ? 'password' : 'text'}
