@@ -451,7 +451,6 @@ export default function AccountsView() {
         can’t be set up right now. You can save a Reddit account, but connecting to it or posting to it
         won’t work until Reddit reopens access.
       </Callout>
-      <div style={{ height: 14 }} />
       <Callout>
         <b>What “Verify” does:</b> it checks the account against the platform right away — it turns{' '}
         <span className="pill p-approved"><i />active</span> when the credentials work, or{' '}
