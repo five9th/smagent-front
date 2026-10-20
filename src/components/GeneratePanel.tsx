@@ -22,6 +22,7 @@ import { Icon } from './Icon'
 import { PostPreview, type PreviewTab } from './PostPreview'
 import { ValuePicker, type Suggestion } from './ValuePicker'
 import {
+  Callout,
   CopyButton,
   InlineError,
   Loading,
@@ -479,11 +480,18 @@ export function GeneratePanel({
       />
       {draftToggle}
       <div className="composer-grid">
-        <div className="card pad">
-          {promptField}
-          {constraintsRow}
-          {actionsRow}
-          {errorBlock}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="card pad">
+            {promptField}
+            {constraintsRow}
+            {actionsRow}
+            {errorBlock}
+          </div>
+          {result?.note && (
+            <Callout tone="warn">
+              <b>Note from the model:</b> {result.note}
+            </Callout>
+          )}
         </div>
         <div className="card pad">
           <div className="eyebrow" style={{ marginBottom: 10 }}>

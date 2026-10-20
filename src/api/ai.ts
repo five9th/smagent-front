@@ -6,6 +6,7 @@ import type {
   GenerateEffort,
   GeneratePlatform,
   GenerateResult,
+  GenerationSettingsDto,
   PostContent,
 } from './types'
 
@@ -76,6 +77,17 @@ export const aiApi = {
 
   /** Effort enum for the picker (stub — may become per-model later). */
   effortLevels: () => api<GenerateEffort[]>('GET', '/ai/effort-levels'),
+
+  /** Effective per-platform style rules + the built-in defaults. */
+  generationSettings: () =>
+    api<GenerationSettingsDto>('GET', '/ai/generation-settings'),
+
+  /**
+   * Full replace of the style overrides. An absent, null or blank value for a
+   * platform resets it to its built-in default. Each rule capped at 1000 chars.
+   */
+  updateGenerationSettings: (platformRules: Record<GeneratePlatform, string | null>) =>
+    api<GenerationSettingsDto>('PUT', '/ai/generation-settings', { platformRules }),
 
   /** One-shot generation; a single call can take up to a minute at high effort. */
   generate: (input: GenerateInput) => api<GenerateResult>('POST', '/ai/generate', input),

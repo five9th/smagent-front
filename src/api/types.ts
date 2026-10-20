@@ -142,4 +142,16 @@ export interface GenerateResult {
   provider: string
   model: string
   usage: TokenUsageDto
+  /**
+   * One short model feedback sentence — present only when something genuinely
+   * needs the user's attention (a contradiction, an unsatisfiable constraint);
+   * never describes the generated text.
+   */
+  note?: string | null
+}
+
+/** Effective per-platform style rules plus the built-ins (for reset UIs). */
+export interface GenerationSettingsDto {
+  platformRules: Record<GeneratePlatform, string>
+  defaults: Record<GeneratePlatform, string>
 }

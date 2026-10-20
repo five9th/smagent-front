@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { aiApi, type CreateAiProviderInput, type UpdateAiProviderInput } from '../api/ai'
-import type { AiProviderDto, AiProviderType } from '../api/types'
+import type { AiProviderDto, AiProviderType, GeneratePlatform } from '../api/types'
 import { GeneratePanel, type AiDraftSeed } from '../components/GeneratePanel'
 import { Icon } from '../components/Icon'
 import { ValuePicker, type Suggestion } from '../components/ValuePicker'
@@ -19,6 +19,7 @@ import { useApiQuery } from '../hooks/useApiQuery'
 import { useToast } from '../hooks/useToast'
 import { describeError } from '../lib/errors'
 import { fmtDate } from '../lib/format'
+import { PLATFORMS, PLATFORM_LIST } from '../lib/platform'
 
 const AI_TYPE_LABELS: Record<AiProviderType, string> = {
   ANTHROPIC: 'Anthropic',
@@ -244,12 +245,117 @@ function ProviderFormModal({
   )
 }
 
+/* --- Generation settings tab ------------------------------------------------ */
+
+const SETTINGS_PLATFORMS: GeneratePlatform[] = ['GENERIC', ...PLATFORM_LIST]
+
+function SettingsTab() {
+  const toast = useToast()
+  const { data, error, loading, refetch } = useApiQuery(
+    () => aiApi.generationSettings(),
+    ['ai-generation-settings'],
+  )
+  /** Local edits layered over the effective rules; untouched platforms absent. */
+  const [edits, setEdits] = useState<Partial<Record<GeneratePlatform, string>>>({})
+  const [busy, setBusy] = useState(false)
+  const [formError, setFormError] = useState<unknown>(null)
+
+  if (loading && !data) return <Loading />
+  if (error && !data) return <ErrorBlock error={error} onRetry={refetch} />
+
+  const effective = (p: GeneratePlatform) => edits[p] ?? data!.platformRules[p] ?? ''
+  const isDefault = (p: GeneratePlatform) => effective(p) === (data!.defaults[p] ?? '')
+  const dirty = SETTINGS_PLATFORMS.some(
+    (p) => p in edits && edits[p] !== (data!.platformRules[p] ?? ''),
+  )
+
+  const save = async () => {
+    setFormError(null)
+    setBusy(true)
+    try {
+      // Full replace; a blank value resets that platform to its built-in default.
+      await aiApi.updateGenerationSettings(
+        Object.fromEntries(
+          SETTINGS_PLATFORMS.map((p) => [p, effective(p).trim() || null]),
+        ) as Record<GeneratePlatform, string | null>,
+      )
+      toast('Style rules saved')
+      setEdits({})
+      refetch()
+    } catch (e) {
+      setFormError(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <SectionHead
+        title="Generation settings"
+        hint="the style half of each platform's rule in the AI's system prompt"
+        actions={
+          <button className="btn primary" onClick={() => void save()} disabled={busy || !dirty}>
+            {busy ? <Spinner /> : 'Save rules'}
+          </button>
+        }
+      />
+      <div className="card pad">
+        {SETTINGS_PLATFORMS.map((p) => (
+          <label className="field" key={p}>
+            <span className="lab" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ flex: 1 }}>
+                {p === 'GENERIC' ? 'Generic' : PLATFORMS[p].label} style
+                {!isDefault(p) && (
+                  <span className="pill p-scheduled" style={{ marginLeft: 6 }}>
+                    <i />
+                    custom
+                  </span>
+                )}
+              </span>
+              {!isDefault(p) && (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  style={{ padding: '2px 8px', fontSize: 11 }}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setEdits((ed) => ({ ...ed, [p]: data!.defaults[p] ?? '' }))
+                  }}
+                >
+                  reset
+                </button>
+              )}
+            </span>
+            <textarea
+              rows={2}
+              maxLength={1000}
+              value={effective(p)}
+              onChange={(e) => setEdits((ed) => ({ ...ed, [p]: e.target.value }))}
+            />
+            <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+              {isDefault(p) ? 'the built-in default' : 'custom — reset to restore the default'}
+            </span>
+          </label>
+        ))}
+        {formError != null && <InlineError error={formError} />}
+      </div>
+      <div style={{ height: 14 }} />
+      <Callout>
+        <b>These are style rules, not limits.</b> The AI shapes every generated variant by them,
+        but nothing is enforced — a style that exceeds a platform's real limits (like X's 280
+        characters) simply produces posts the platform may reject at publish time.
+      </Callout>
+    </>
+  )
+}
+
 /* --- Main view ------------------------------------------------------------- */
 
 export default function AiView() {
   const nav = useNavigate()
   const toast = useToast()
-  const [tab, setTab] = useState<'providers' | 'generate'>('providers')
+  const [tab, setTab] = useState<'providers' | 'generate' | 'settings'>('providers')
   const { data, error, loading, refetch } = useApiQuery(() => aiApi.list(), ['ai-providers'])
   const providers = data ?? []
   const [formOpen, setFormOpen] = useState<AiProviderDto | null | 'new'>(null)
@@ -294,6 +400,9 @@ export default function AiView() {
         </button>
         <button className={tab === 'generate' ? 'active' : ''} onClick={() => setTab('generate')}>
           Generate
+        </button>
+        <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
+          Settings
         </button>
       </div>
 
@@ -373,7 +482,7 @@ export default function AiView() {
             </Callout>
           </>
         )
-      ) : (
+      ) : tab === 'generate' ? (
         <GeneratePanel
           providers={providers}
           loading={loading && !data}
@@ -381,6 +490,8 @@ export default function AiView() {
           onGoToProviders={() => setTab('providers')}
           onOpenInEditor={(seed: AiDraftSeed) => nav('/posts/new', { state: { aiDraft: seed } })}
         />
+      ) : (
+        <SettingsTab />
       )}
 
       {formOpen !== null && (

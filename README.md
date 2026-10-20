@@ -5,7 +5,7 @@ Write one post, tailor it per platform, publish to every connected social
 account, and keep the full attempt history. AI assistance (providers,
 generation) and engagement tracking are stubbed until the backend ships them.
 
-Backend version this project is aligned with: 0.8.0+7e1009aa
+Backend version this project is aligned with: 0.9.2+8c87f2c
 
 ## Dev
 
