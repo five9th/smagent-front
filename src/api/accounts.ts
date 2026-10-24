@@ -43,6 +43,6 @@ export const accountsApi = {
  * (GET /api/oauth/<provider>/authorize/{id}). Must be a real navigation, not a
  * fetch — the session cookie and LinkedIn/X redirects ride the browser.
  */
-export function oauthAuthorizePath(provider: 'linkedin' | 'x', accountId: number): string {
+export function oauthAuthorizePath(provider: 'linkedin' | 'x' | 'facebook', accountId: number): string {
   return `${import.meta.env.BASE_URL}api/oauth/${provider}/authorize/${accountId}`
 }

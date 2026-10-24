@@ -20,11 +20,10 @@ export interface LoginOption {
   /** True when a prefilled share/composer URL can be composed for this option. */
   canShare: boolean
   /**
-   * 3-legged OAuth flow for the token field: provider slug when available
-   * ('linkedin' | 'x'), 'planned' when the backend hasn't shipped it (button
-   * renders disabled). Absent for non-token options.
+   * 3-legged OAuth flow provider slug for the token field ('linkedin', 'x',
+   * 'facebook'). Absent for non-token options.
    */
-  oauth?: 'linkedin' | 'x' | 'planned'
+  oauth?: 'linkedin' | 'x' | 'facebook'
   fields: CredentialField[]
 }
 
@@ -67,7 +66,7 @@ export const PLATFORMS: Record<Platform, PlatformMeta> = {
         authMethod: 'PAGE_ACCESS_TOKEN',
         canPublish: true,
         canShare: false,
-        oauth: 'planned',
+        oauth: 'facebook',
         fields: [
           { key: 'pageId', label: 'Page ID', placeholder: '123456789012345', nonSecret: true },
           {

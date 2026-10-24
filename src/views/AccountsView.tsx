@@ -56,7 +56,7 @@ function AccountFormModal({
    */
   const startOauth = async () => {
     const provider = loginOption.oauth
-    if (provider !== 'linkedin' && provider !== 'x') return
+    if (provider !== 'linkedin' && provider !== 'x' && provider !== 'facebook') return
     setError(null)
     if (editing) {
       // token refresh for an existing account — straight to the flow
@@ -241,16 +241,7 @@ function AccountFormModal({
       ))}
       {loginOption.oauth && (
         <div style={{ marginTop: 12 }}>
-          {loginOption.oauth === 'planned' ? (
-            <>
-              <span className="dim" style={{ display: 'inline-block' }}>
-                <button className="btn" disabled>
-                  <Icon name="external" /> Get token with OAuth
-                </button>
-              </span>{' '}
-              <span className="hint">coming later for Facebook — paste a Page token for now</span>
-            </>
-          ) : editing && methodChanged ? (
+          {editing && methodChanged ? (
             <>
               <span className="dim" style={{ display: 'inline-block' }}>
                 <button className="btn" disabled>
