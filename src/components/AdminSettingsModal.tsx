@@ -77,7 +77,7 @@ export function AdminSettingsModal({ onClose }: { onClose: () => void }) {
   }
 
   const statusOf = (status: AdminSettingsStatus, provider: OAuthProviderKey, field: FieldKey) =>
-    status[provider][field === 'clientId' ? 'clientIdSet' : 'clientSecretSet']
+    status[provider][field === 'clientId' ? 'clientIdOverridden' : 'clientSecretOverridden']
 
   return (
     <Modal

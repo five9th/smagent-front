@@ -5,9 +5,9 @@ export type OAuthProviderKey = 'facebook' | 'linkedin' | 'x'
 
 /** GET /api/admin/settings — which overrides are stored (values never returned). */
 export interface AdminSettingsStatus {
-  facebook: { clientIdSet: boolean; clientSecretSet: boolean }
-  linkedin: { clientIdSet: boolean; clientSecretSet: boolean }
-  x: { clientIdSet: boolean; clientSecretSet: boolean }
+  facebook: { clientIdOverridden: boolean; clientSecretOverridden: boolean }
+  linkedin: { clientIdOverridden: boolean; clientSecretOverridden: boolean }
+  x: { clientIdOverridden: boolean; clientSecretOverridden: boolean }
 }
 
 export interface AdminSettingsOverride {
