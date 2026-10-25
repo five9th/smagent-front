@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { accountsApi } from '../api/accounts'
 import { useApiQuery } from '../hooks/useApiQuery'
 import { useAuth } from '../hooks/useAuth'
 import { Icon, type IconName } from './Icon'
+import { AdminSettingsModal } from './AdminSettingsModal'
 import { VersionLine } from './VersionLine'
 
 const NAV: Array<{ to: string; label: string; icon: IconName }> = [
@@ -40,6 +42,7 @@ function toggleTheme() {
 
 export default function AppShell() {
   const { user, logout } = useAuth()
+  const [adminOpen, setAdminOpen] = useState(false)
   const nav = useNavigate()
   const { pathname } = useLocation()
   const { data: accounts } = useApiQuery(() => accountsApi.list(), ['accounts', 'shell'])
@@ -115,6 +118,14 @@ export default function AppShell() {
           <Link className="tbtn feedback-btn" to="/feedback" title="Demo feedback" aria-label="Demo feedback">
             <Icon name="feedback" />
           </Link>
+          <button
+            className="tbtn"
+            onClick={() => setAdminOpen(true)}
+            title="Admin settings (OAuth app credentials)"
+            aria-label="Admin settings"
+          >
+            <Icon name="settings" />
+          </button>
           <button className="tbtn" onClick={toggleTheme} title="Toggle light / dark" aria-label="Toggle theme">
             ◐
           </button>
@@ -135,6 +146,8 @@ export default function AppShell() {
           ))}
         </nav>
       </div>
+
+      {adminOpen && <AdminSettingsModal onClose={() => setAdminOpen(false)} />}
     </div>
   )
 }
