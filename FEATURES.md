@@ -89,10 +89,12 @@ Every published post keeps a full attempt history, newest first: platform, accou
 
 ### AI generation tab
 
-Next to the Editor tab is **AI Generation** (drafts only). It's the same generator as on the AI Assistant page (below), with two extras:
+Next to the Editor tab are **AI Generation** and **AI Settings** (drafts only). AI Generation is the same generator as on the AI Assistant page (below), with two extras:
 
 - **Show draft to AI** — with your consent, the current editor content rides along so the model refines your text instead of writing from scratch.
-- Results get **Apply** buttons: apply everything, just the generic text, or one platform variant — straight into the draft. Nothing is ever posted automatically.
+- Results get **Apply** buttons: **Apply all** takes everything and returns you to the editor, while the small per-variant Apply buttons fill the generic text or one platform variant in place, so you can keep generating and apply several variants one by one. Nothing is ever posted automatically.
+
+**AI Settings** is the same per-platform style-rules editor as the Settings tab on the AI Assistant page.
 
 ---
 

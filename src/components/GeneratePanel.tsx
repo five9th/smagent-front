@@ -267,6 +267,10 @@ export function GeneratePanel({
         onChange={(e) => setPrompt(e.target.value)}
         placeholder="e.g. Post about releasing v2 of our CLI tool"
       />
+      <span className="hint" style={{ display: 'block', marginTop: 4 }}>
+        The model has no memory — every generation starts from scratch, so don't refer to previous
+        prompts; repeat whatever it needs to know.
+      </span>
     </label>
   )
 

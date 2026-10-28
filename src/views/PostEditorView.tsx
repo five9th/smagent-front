@@ -14,6 +14,7 @@ import type {
   PublishResult,
 } from '../api/types'
 import { GeneratePanel, type AiDraftSeed, type ApplyTarget } from '../components/GeneratePanel'
+import { GenerationSettingsPanel } from '../components/GenerationSettingsPanel'
 import { Icon } from '../components/Icon'
 import { PostPreview, type PreviewTab } from '../components/PostPreview'
 import {
@@ -489,8 +490,9 @@ function Editor({
   // so switching the Edit/AI tabs never loses its state.
   const providersQuery = useApiQuery(() => aiApi.list(), ['ai-providers'])
   const providers = providersQuery.data ?? []
-  const [page, setPage] = useState<'edit' | 'ai'>('edit')
+  const [page, setPage] = useState<'edit' | 'ai' | 'settings'>('edit')
   const [aiVisited, setAiVisited] = useState(false)
+  const [settingsVisited, setSettingsVisited] = useState(false)
 
   const dirty = !readOnly && JSON.stringify(form) !== baseline
 
@@ -710,8 +712,9 @@ function Editor({
   }
 
   /**
-   * Apply a generation result into the form: 'all' takes everything, otherwise
-   * just the generic content or one platform variant. Generated overrides carry
+   * Apply a generation result into the form: 'all' takes everything and
+   * returns to the editor; a single variant applies in place so several
+   * variants can be applied one after another. Generated overrides carry
    * no link — the form's existing link values stay untouched.
    */
   const applyGenerated = (r: GenerateResult, which: ApplyTarget) => {
@@ -729,7 +732,7 @@ function Editor({
         ovr,
       }
     })
-    setPage('edit')
+    if (which === 'all') setPage('edit')
     toast(
       which === 'all'
         ? 'AI text applied to the draft'
@@ -774,6 +777,15 @@ function Editor({
             }}
           >
             AI Generation
+          </button>
+          <button
+            className={page === 'settings' ? 'active' : ''}
+            onClick={() => {
+              setPage('settings')
+              setSettingsVisited(true)
+            }}
+          >
+            AI Settings
           </button>
         </div>
       )}
@@ -1158,6 +1170,12 @@ function Editor({
             onApply={applyGenerated}
             onGoToProviders={() => nav('/ai')}
           />
+        </div>
+      )}
+
+      {!readOnly && settingsVisited && (
+        <div style={{ display: page === 'settings' ? undefined : 'none' }}>
+          <GenerationSettingsPanel />
         </div>
       )}
 
