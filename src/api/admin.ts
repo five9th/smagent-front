@@ -10,6 +10,7 @@ export interface AdminSettingsStatus {
   x: { clientIdOverridden: boolean; clientSecretOverridden: boolean }
 }
 
+/** Per-field override patch: a non-empty string sets/replaces, "" clears. */
 export interface AdminSettingsOverride {
   clientId?: string
   clientSecret?: string
@@ -19,9 +20,9 @@ export const adminApi = {
   status: () => api<AdminSettingsStatus>('GET', '/admin/settings'),
 
   /**
-   * Replace the whole override set (204): stored overrides are deleted, then
-   * only what's in the body is saved — omitted fields clear back to config
-   * values. Blank values are rejected (400), send only non-empty strings.
+   * Patch the override set field-by-field (204): a non-empty string sets or
+   * replaces that field's override, an explicit "" clears it back to the
+   * config value, and an omitted field is left untouched.
    */
   putSettings: (overrides: Partial<Record<OAuthProviderKey, AdminSettingsOverride>>) =>
     api<void>('PUT', '/admin/settings', overrides),
