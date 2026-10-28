@@ -1,6 +1,16 @@
 import { api } from './client'
 import type { AccountDto, AuthMethod, Platform, VerifyResult } from './types'
 
+/**
+ * Fired after any account mutation (verify/add/edit/remove) so far-away
+ * listeners — the topbar health dots in the app shell — refetch their copy.
+ */
+export const ACCOUNTS_CHANGED_EVENT = 'smagent:accounts-changed'
+
+export function notifyAccountsChanged() {
+  window.dispatchEvent(new Event(ACCOUNTS_CHANGED_EVENT))
+}
+
 export interface AccountInput {
   platform: Platform
   authMethod: AuthMethod

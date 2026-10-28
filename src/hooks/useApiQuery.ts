@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface QueryState<T> {
   data?: T
@@ -42,8 +42,10 @@ export function useApiQuery<T>(fetcher: () => Promise<T>, deps: unknown[]) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick])
 
+  const refetch = useCallback(() => setTick((t) => t + 1), [])
+
   return {
     ...state,
-    refetch: () => setTick((t) => t + 1),
+    refetch,
   }
 }

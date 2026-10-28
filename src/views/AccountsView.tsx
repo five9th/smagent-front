@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { accountsApi, oauthAuthorizePath, type AccountInput } from '../api/accounts'
+import { accountsApi, notifyAccountsChanged, oauthAuthorizePath, type AccountInput } from '../api/accounts'
 import type { AccountDto, AuthMethod, Platform } from '../api/types'
 import { Icon } from '../components/Icon'
 import {
@@ -319,6 +319,7 @@ export default function AccountsView() {
     } finally {
       setVerifying(null)
       refetch()
+      notifyAccountsChanged()
     }
   }
 
@@ -334,6 +335,7 @@ export default function AccountsView() {
     } finally {
       setDeleteBusy(false)
       refetch()
+      notifyAccountsChanged()
     }
   }
 
@@ -457,6 +459,7 @@ export default function AccountsView() {
           onSaved={() => {
             setFormOpen(null)
             refetch()
+            notifyAccountsChanged()
           }}
         />
       )}

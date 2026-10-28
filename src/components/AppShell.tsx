@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { accountsApi } from '../api/accounts'
+import { ACCOUNTS_CHANGED_EVENT, accountsApi } from '../api/accounts'
 import { useApiQuery } from '../hooks/useApiQuery'
 import { useAuth } from '../hooks/useAuth'
 import { Icon, type IconName } from './Icon'
@@ -45,7 +45,18 @@ export default function AppShell() {
   const [adminOpen, setAdminOpen] = useState(false)
   const nav = useNavigate()
   const { pathname } = useLocation()
-  const { data: accounts } = useApiQuery(() => accountsApi.list(), ['accounts', 'shell'])
+  const { data: accounts, refetch: refetchAccounts } = useApiQuery(() => accountsApi.list(), [
+    'accounts',
+    'shell',
+  ])
+
+  // Account mutations on the Accounts page announce themselves; refresh so the
+  // topbar health dots always reflect the latest statuses.
+  useEffect(() => {
+    const onChange = () => refetchAccounts()
+    window.addEventListener(ACCOUNTS_CHANGED_EVENT, onChange)
+    return () => window.removeEventListener(ACCOUNTS_CHANGED_EVENT, onChange)
+  }, [refetchAccounts])
 
   const onLogout = async () => {
     await logout()
