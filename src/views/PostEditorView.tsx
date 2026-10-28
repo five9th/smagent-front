@@ -937,6 +937,11 @@ function Editor({
                     placeholder={form.ovr[tab].on ? form.link || 'no generic link either' : '—'}
                   />
                 </label>
+                {tab === 'X' && form.ovr[tab].on && effectiveLink(form, 'X').trim() && (
+                  <p className="hint" style={{ margin: '10px 0 0', color: 'var(--warn)' }}>
+                    ⚠ An X post that includes a link consumes ~13× more API credits than a link-free one.
+                  </p>
+                )}
                 <p className="hint">
                   Leave the override title empty to reuse the generic title. The override text replaces the
                   generic text — but only on this platform.
