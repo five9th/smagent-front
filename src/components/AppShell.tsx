@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { accountsApi } from '../api/accounts'
+import { ACCOUNTS_CHANGED_EVENT, accountsApi } from '../api/accounts'
 import { useApiQuery } from '../hooks/useApiQuery'
 import { useAuth } from '../hooks/useAuth'
 import { Icon, type IconName } from './Icon'
+import { AdminSettingsModal } from './AdminSettingsModal'
+import { VersionLine } from './VersionLine'
 
 const NAV: Array<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: 'Dashboard', icon: 'dashboard' },
@@ -18,6 +21,7 @@ function viewTitle(pathname: string): string {
   if (pathname.startsWith('/accounts')) return 'Accounts'
   if (pathname.startsWith('/ai')) return 'AI Assistant'
   if (pathname.startsWith('/inbox')) return 'Inbox'
+  if (pathname.startsWith('/feedback')) return 'Demo feedback'
   return 'SMAgent'
 }
 
@@ -38,9 +42,21 @@ function toggleTheme() {
 
 export default function AppShell() {
   const { user, logout } = useAuth()
+  const [adminOpen, setAdminOpen] = useState(false)
   const nav = useNavigate()
   const { pathname } = useLocation()
-  const { data: accounts } = useApiQuery(() => accountsApi.list(), ['accounts', 'shell'])
+  const { data: accounts, refetch: refetchAccounts } = useApiQuery(() => accountsApi.list(), [
+    'accounts',
+    'shell',
+  ])
+
+  // Account mutations on the Accounts page announce themselves; refresh so the
+  // topbar health dots always reflect the latest statuses.
+  useEffect(() => {
+    const onChange = () => refetchAccounts()
+    window.addEventListener(ACCOUNTS_CHANGED_EVENT, onChange)
+    return () => window.removeEventListener(ACCOUNTS_CHANGED_EVENT, onChange)
+  }, [refetchAccounts])
 
   const onLogout = async () => {
     await logout()
@@ -71,6 +87,12 @@ export default function AppShell() {
             </NavLink>
           ))}
         </nav>
+        <nav className="nav nav-bottom">
+          <NavLink to="/feedback">
+            <Icon name="feedback" />
+            <span>Demo feedback</span>
+          </NavLink>
+        </nav>
         <div className="foot">
           <div className="avatar">{(user?.username ?? '?').slice(0, 1).toUpperCase()}</div>
           <div className="who">
@@ -81,6 +103,7 @@ export default function AppShell() {
             <Icon name="logout" />
           </button>
         </div>
+        <VersionLine />
       </aside>
 
       <div className="main">
@@ -102,6 +125,18 @@ export default function AppShell() {
             <Icon name="plus" />
             New post
           </Link>
+          {/* Desktop rail has the Demo feedback tab; on mobile this is the only entry point. */}
+          <Link className="tbtn feedback-btn" to="/feedback" title="Demo feedback" aria-label="Demo feedback">
+            <Icon name="feedback" />
+          </Link>
+          <button
+            className="tbtn"
+            onClick={() => setAdminOpen(true)}
+            title="Admin settings (OAuth app credentials)"
+            aria-label="Admin settings"
+          >
+            <Icon name="settings" />
+          </button>
           <button className="tbtn" onClick={toggleTheme} title="Toggle light / dark" aria-label="Toggle theme">
             ◐
           </button>
@@ -122,6 +157,8 @@ export default function AppShell() {
           ))}
         </nav>
       </div>
+
+      {adminOpen && <AdminSettingsModal onClose={() => setAdminOpen(false)} />}
     </div>
   )
 }

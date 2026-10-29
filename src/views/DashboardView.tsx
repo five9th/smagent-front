@@ -23,7 +23,7 @@ interface DashboardData {
 async function loadDashboard(): Promise<DashboardData> {
   const [posts, accounts] = await Promise.all([postsApi.list(), accountsApi.list()])
   // Publications are only included on single-post GETs (and /api/publications
-  // requires postId), so fan out over the newest published posts.
+  // requires postId), so fan out over the newest posts that went out at all.
   const newestPublished = posts.filter((p) => p.status === 'PUBLISHED').slice(0, 5)
   const details = await Promise.all(
     newestPublished.map((p) => postsApi.get(p.id).catch(() => null)),
@@ -32,7 +32,7 @@ async function loadDashboard(): Promise<DashboardData> {
   const recentPublications = details
     .filter((d): d is PostDto => d !== null)
     .flatMap((d) =>
-      d.publications.map((pub) => ({ ...pub, postTitle: titleById.get(d.id)?.title ?? null })),
+      d.publications.map((pub) => ({ ...pub, postTitle: titleById.get(d.id)?.content.title ?? null })),
     )
     .sort((a, b) => (a.publishedAt ?? a.createdAt).localeCompare(b.publishedAt ?? b.createdAt))
     .reverse()
@@ -80,7 +80,7 @@ export default function DashboardView() {
   const { data, error, loading, refetch } = useApiQuery(loadDashboard, ['dashboard'])
 
   if (loading && !data) return <Loading />
-  if (error && !data) return <ErrorBlock message={error} onRetry={refetch} />
+  if (error && !data) return <ErrorBlock error={error} onRetry={refetch} />
 
   const posts = data?.posts ?? []
   const accounts = data?.accounts ?? []
@@ -168,18 +168,18 @@ export default function DashboardView() {
           </div>
           <div className="card pad" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Callout>
-              <b>Compose once, publish everywhere.</b> Write a post, optionally tailor the text per
-              platform, pick target accounts and publish — one attempt per account, results shown
-              per target. <Link to="/posts/new">Create a post →</Link>
+              <b>Compose once, publish everywhere.</b> Write a post, tailor the text per platform if you
+              like, pick the accounts and publish — each account is handled separately, and failures are
+              reported one by one. <Link to="/posts/new">Create a post →</Link>
             </Callout>
             <Callout>
-              <b>AI assistance is on the way.</b> Provider management, token usage and text
-              generation are designed but not implemented on the backend yet.{' '}
-              <Link to="/ai">Preview the AI panel →</Link>
+              <b>Draft with AI.</b> Connect a provider and generate post text — the generic version
+              plus per-platform variants — then edit and publish as usual.{' '}
+              <Link to="/ai">Try it →</Link>
             </Callout>
             <Callout tone="warn">
-              <b>Engagement inbox is coming too.</b> Comment and reaction tracking will land as
-              polling-based sync. <Link to="/inbox">Preview the inbox →</Link>
+              <b>An engagement inbox is coming too</b> — comments and reactions on your posts, gathered
+              in one place. <Link to="/inbox">See what’s coming →</Link>
             </Callout>
           </div>
         </div>

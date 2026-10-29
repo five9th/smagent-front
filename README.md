@@ -5,6 +5,8 @@ Write one post, tailor it per platform, publish to every connected social
 account, and keep the full attempt history. AI assistance (providers,
 generation) and engagement tracking are stubbed until the backend ships them.
 
+Backend version this project is aligned with: 0.9.2+8c87f2c
+
 ## Dev
 
 ```bash
@@ -64,13 +66,27 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
+    location /actuator/ {                   # backend build info for the version display
+        proxy_pass http://127.0.0.1:8080;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;   # SPA fallback for client-side routes
     }
 }
 ```
 
-Serving under a subpath: set `base: '/<subpath>/'` in `vite.config.ts` before building.
+Serving under a subpath (demo VPS layout, `https://<host>/smagent/`):
+
+```bash
+npm run build:demo   # same as `build` but with SMAGENT_BASE_PATH=/smagent/
+```
+
+Copy `dist/` to `/var/www/smagent` on the VPS and use
+[`deploy/nginx-smagent.conf`](deploy/nginx-smagent.conf). It proxies
+`/smagent/api/` → the backend with the prefix stripped, so the API stays
+same-origin and no CORS changes are needed on the backend. `SMAGENT_BASE_PATH`
+only affects asset URLs and the SPA's API base; dev on `/` is unchanged.
 
 Opening `dist/index.html` via `file://` shows the UI but can't log in — the
 `SameSite=Lax` session cookie isn't sent from a `file://` origin. Without nginx,

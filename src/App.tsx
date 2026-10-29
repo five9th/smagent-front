@@ -7,6 +7,7 @@ import { ToastProvider } from './hooks/ToastProvider'
 import AccountsView from './views/AccountsView'
 import AiView from './views/AiView'
 import DashboardView from './views/DashboardView'
+import FeedbackView from './views/FeedbackView'
 import InboxView from './views/InboxView'
 import LoginView from './views/LoginView'
 import PostEditorView from './views/PostEditorView'
@@ -27,7 +28,7 @@ function RequireAuth({ children }: { children: React.ReactElement }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <AuthProvider>
         <ToastProvider>
           <Routes>
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/posts/new" element={<PostEditorView />} />
               <Route path="/posts/:id" element={<PostEditorView />} />
               <Route path="/accounts" element={<AccountsView />} />
+              <Route path="/feedback" element={<FeedbackView />} />
               <Route path="/ai" element={<AiView />} />
               <Route path="/inbox" element={<InboxView />} />
               <Route path="*" element={<Navigate to="/" replace />} />
