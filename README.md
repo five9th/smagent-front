@@ -1,11 +1,14 @@
 # SMAgent front
 
-SPA for SMAgent — the social-media agent backend (Spring Boot, see `../smagent`).
+SPA for SMAgent — the social-media agent backend.
 Write one post, tailor it per platform, publish to every connected social
-account, and keep the full attempt history. AI assistance (providers,
-generation) and engagement tracking are stubbed until the backend ships them.
+account, and keep the full publication history. Engagement tracking feature 
+is stubbed until the backend ships it.
 
-Backend version this project is aligned with: 0.9.2+8c87f2c
+**For releases go to [smagent-deploy](https://github.com/five9th/smagent-deploy).**
+It contains a compose file that lets you run the app as a single docker container.
+
+Backend version this project is aligned with: 0.11.3+41aefe27
 
 ## Dev
 
